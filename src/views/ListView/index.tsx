@@ -1,0 +1,170 @@
+import { useState, useRef } from 'react';
+import { useTaskContext } from '../../contexts/TaskContext';
+import { useAppState } from '../../contexts/AppContext';
+import { TaskCard } from '../../components/task/TaskCard';
+import { TaskForm } from '../../components/task/TaskForm';
+import { Modal } from '../../components/ui/Modal';
+import type { Task } from '../../types';
+
+function reorderArray(arr: Task[], fromId: string, toId: string): Task[] {
+  const result = [...arr];
+  const fromIdx = result.findIndex((t) => t.id === fromId);
+  const toIdx = result.findIndex((t) => t.id === toId);
+  if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return result;
+  const [moved] = result.splice(fromIdx, 1);
+  result.splice(toIdx, 0, moved);
+  return result;
+}
+
+export function ListView() {
+  const { state, reorderTasks, addTask } = useTaskContext();
+  const { state: appState } = useAppState();
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [showBulkAdd, setShowBulkAdd] = useState(false);
+  const [editTask, setEditTask] = useState<Task | null>(null);
+
+  // ドラッグ状態
+  const dragId = useRef<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  // 複数追加テキスト
+  const [bulkText, setBulkText] = useState('');
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  const selectedList = state.lists.find((l) => l.id === appState.selectedListId);
+  const listTasks = appState.selectedListId
+    ? state.tasks
+        .filter((t) => t.listId === appState.selectedListId && t.status === 'active' && !t.addedToToday)
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    : [];
+
+  const handleDragStart = (id: string) => { dragId.current = id; };
+  const handleDragOver = (e: React.DragEvent, id: string) => { e.preventDefault(); setDragOverId(id); };
+  const handleDrop = (toId: string) => {
+    if (dragId.current && dragId.current !== toId) {
+      const reordered = reorderArray(listTasks, dragId.current, toId);
+      reorderTasks(reordered.map((t) => t.id));
+    }
+    dragId.current = null;
+    setDragOverId(null);
+  };
+  const handleDragEnd = () => { dragId.current = null; setDragOverId(null); };
+
+  const handleBulkAdd = async () => {
+    if (!appState.selectedListId) return;
+    const lines = bulkText.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+    setBulkSaving(true);
+    try {
+      for (const content of lines) {
+        await addTask({ content, detail: '', priority: 'A', dueDate: null, listId: appState.selectedListId, addedToToday: false });
+      }
+      setBulkText('');
+      setShowBulkAdd(false);
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  if (!selectedList) {
+    return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+        左のメニューからリストを選択してください
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', maxWidth: 720 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600 }}>{selectedList.name}</h2>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowBulkAdd(true)}>
+            複数追加
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowTaskForm(true)}>
+            + タスク追加
+          </button>
+        </div>
+      </div>
+
+      {listTasks.length === 0 ? (
+        <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0' }}>
+          タスクはありません
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {listTasks.map((t) => (
+            <div
+              key={t.id}
+              draggable
+              onDragStart={() => handleDragStart(t.id)}
+              onDragOver={(e) => handleDragOver(e, t.id)}
+              onDrop={() => handleDrop(t.id)}
+              onDragEnd={handleDragEnd}
+              style={{
+                opacity: dragId.current === t.id ? 0.4 : 1,
+                borderTop: dragOverId === t.id && dragId.current !== t.id ? '2px solid var(--accent)' : '2px solid transparent',
+                cursor: 'grab',
+              }}
+            >
+              <TaskCard task={t} onEdit={setEditTask} showAddToToday />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button
+        onClick={() => setShowTaskForm(true)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: '100%', marginTop: 12, padding: '10px',
+          border: '1px dashed var(--border)', borderRadius: 'var(--radius)',
+          color: 'var(--text-muted)', fontSize: 20,
+          background: 'transparent', cursor: 'pointer',
+        }}
+        title="タスクを追加"
+      >＋</button>
+
+      {(showTaskForm || editTask) && (
+        <Modal
+          title={editTask ? 'タスクを編集' : 'タスクを追加'}
+          onClose={() => { setShowTaskForm(false); setEditTask(null); }}
+        >
+          <TaskForm
+            lists={state.lists}
+            defaultListId={appState.selectedListId || undefined}
+            task={editTask || undefined}
+            onClose={() => { setShowTaskForm(false); setEditTask(null); }}
+          />
+        </Modal>
+      )}
+
+      {showBulkAdd && (
+        <Modal title="複数タスクを追加" onClose={() => { setShowBulkAdd(false); setBulkText(''); }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              1行につき1タスクとして追加されます。優先度はAに設定されます。
+            </div>
+            <textarea
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              placeholder={'タスク1\nタスク2\nタスク3'}
+              rows={8}
+              autoFocus
+              style={{ resize: 'vertical' }}
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => { setShowBulkAdd(false); setBulkText(''); }}>
+                キャンセル
+              </button>
+              <button className="btn btn-primary" onClick={handleBulkAdd} disabled={bulkSaving || !bulkText.trim()}>
+                {bulkSaving ? '追加中...' : `追加（${bulkText.split('\n').filter(l => l.trim()).length}件）`}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,268 @@
+import { useState } from 'react';
+import type { Priority, Task } from '../../types';
+import { useTaskContext } from '../../contexts/TaskContext';
+import { TaskCard } from '../../components/task/TaskCard';
+import { TaskForm } from '../../components/task/TaskForm';
+import { Modal } from '../../components/ui/Modal';
+import { PriorityBadge } from '../../components/task/PriorityBadge';
+import { getTopPriorityTask, getSecondPriorityTask } from '../../utils/priorityUtils';
+
+const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+
+function formatTodayHeader(): string {
+  const now = new Date();
+  const m = now.getMonth() + 1;
+  const d = now.getDate();
+  const w = WEEKDAYS[now.getDay()];
+  return `${m}月${d}日（${w}）`;
+}
+
+export function TodayView() {
+  const { state, removeFromToday, completeTask, setTopPriority, setSecondPriority, updateTask, addTask } = useTaskContext();
+  const [showForm, setShowForm] = useState(false);
+  const [editTask, setEditTask] = useState<Task | null>(null);
+  const [showBulkAdd, setShowBulkAdd] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  const todayTasks = state.tasks.filter((t) => t.status === 'active' && t.addedToToday);
+  const top = getTopPriorityTask(todayTasks);
+  const second = getSecondPriorityTask(todayTasks, top?.id || null);
+  const restTasks = todayTasks
+    .filter((t) => t.id !== top?.id && t.id !== second?.id)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  const changePriority = (task: Task, p: Priority) => updateTask(task.id, { priority: p });
+
+  const hasPriorityCards = top || second;
+
+  const handleBulkAdd = async () => {
+    const lines = bulkText.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+    setBulkSaving(true);
+    try {
+      const listId = state.lists[0]?.id ?? '';
+      for (const content of lines) {
+        await addTask({ content, detail: '', priority: 'A', dueDate: null, listId, addedToToday: true });
+      }
+      setBulkText('');
+      setShowBulkAdd(false);
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 700 }}>今日のタスク</h1>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{formatTodayHeader()}</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowBulkAdd(true)}>
+            複数追加
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
+            + タスク追加
+          </button>
+        </div>
+      </div>
+
+      {todayTasks.length === 0 ? (
+        <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '60px 0' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+          <div>今日のタスクはありません</div>
+        </div>
+      ) : (
+        <>
+          {top && (
+            <PriorityCard
+              task={top}
+              rank="top"
+              onEdit={() => setEditTask(top)}
+              onComplete={() => completeTask(top.id)}
+              onRemove={() => removeFromToday(top.id)}
+              onSetTop={() => setTopPriority(top.id)}
+              onSetSecond={() => setSecondPriority(top.id)}
+              onChangePriority={(p) => changePriority(top, p)}
+            />
+          )}
+
+          {second && (
+            <PriorityCard
+              task={second}
+              rank="second"
+              onEdit={() => setEditTask(second)}
+              onComplete={() => completeTask(second.id)}
+              onRemove={() => removeFromToday(second.id)}
+              onSetTop={() => setTopPriority(second.id)}
+              onSetSecond={() => setSecondPriority(second.id)}
+              onChangePriority={(p) => changePriority(second, p)}
+            />
+          )}
+
+          {hasPriorityCards && restTasks.length > 0 && (
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '12px 0' }} />
+          )}
+
+          {restTasks.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {restTasks.map((t) => (
+                <TaskCard key={t.id} task={t} onEdit={setEditTask} showRemoveFromToday showPriorityButtons />
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={() => setShowForm(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              marginTop: 12,
+              padding: '10px',
+              border: '1px dashed var(--border)',
+              borderRadius: 'var(--radius)',
+              color: 'var(--text-muted)',
+              fontSize: 20,
+              background: 'transparent',
+              cursor: 'pointer',
+            }}
+            title="タスクを追加"
+          >＋</button>
+        </>
+      )}
+
+      {(showForm || editTask) && (
+        <Modal
+          title={editTask ? 'タスクを編集' : 'タスクを追加'}
+          onClose={() => { setShowForm(false); setEditTask(null); }}
+        >
+          <TaskForm
+            lists={state.lists}
+            task={editTask || undefined}
+            defaultAddToToday
+            onClose={() => { setShowForm(false); setEditTask(null); }}
+          />
+        </Modal>
+      )}
+
+      {showBulkAdd && (
+        <Modal title="複数タスクを追加（今日）" onClose={() => { setShowBulkAdd(false); setBulkText(''); }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              1行につき1タスクとして追加されます。優先度はAに設定されます。
+            </div>
+            <textarea
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              placeholder={'タスク1\nタスク2\nタスク3'}
+              rows={8}
+              autoFocus
+              style={{ resize: 'vertical' }}
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => { setShowBulkAdd(false); setBulkText(''); }}>
+                キャンセル
+              </button>
+              <button className="btn btn-primary" onClick={handleBulkAdd} disabled={bulkSaving || !bulkText.trim()}>
+                {bulkSaving ? '追加中...' : `追加（${bulkText.split('\n').filter(l => l.trim()).length}件）`}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── Priority Card ───────────────────────────────────────────────
+interface PriorityCardProps {
+  task: Task;
+  rank: 'top' | 'second';
+  onEdit: () => void;
+  onComplete: () => void;
+  onRemove: () => void;
+  onSetTop: () => void;
+  onSetSecond: () => void;
+  onChangePriority: (p: Priority) => void;
+}
+
+function PriorityCard({ task, rank, onEdit, onComplete, onRemove, onSetTop, onSetSecond, onChangePriority }: PriorityCardProps) {
+  const [expanded, setExpanded] = useState(false);
+  const isTop = rank === 'top';
+
+  const bgColor = isTop
+    ? 'rgba(255, 110, 30, 0.10)'
+    : 'rgba(220, 180, 0, 0.10)';
+
+  return (
+    <div
+      style={{
+        background: bgColor,
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        padding: '14px',
+        marginBottom: 10,
+        cursor: 'pointer',
+      }}
+      onClick={() => setExpanded(!expanded)}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <button
+          style={{
+            width: 22, height: 22, minHeight: 22, padding: 0, flexShrink: 0,
+            border: '2px solid var(--border)', borderRadius: '50%',
+            background: 'transparent', marginTop: 2, cursor: 'pointer',
+          }}
+          onClick={(e) => { e.stopPropagation(); onComplete(); }}
+          title="完了"
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <PriorityBadge priority={task.priority} onChange={onChangePriority} />
+            {task.dueDate && (
+              <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{task.dueDate}</span>
+            )}
+          </div>
+          <div style={{ fontSize: isTop ? 17 : 15, fontWeight: isTop ? 600 : 500, wordBreak: 'break-word' }}>
+            {task.content}
+          </div>
+          {expanded && task.detail && (
+            <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
+              {task.detail}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            title="編集"
+            style={{ fontSize: 15, padding: '4px 8px', minHeight: 36 }}
+          >✎</button>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={(e) => { e.stopPropagation(); onSetTop(); }}
+            title={task.isTopPriority ? '最優先を解除' : '最優先に設定'}
+            style={{ fontSize: 13, padding: '4px 6px', minHeight: 36, color: task.isTopPriority ? 'var(--warning)' : 'var(--text-muted)' }}
+          >★</button>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={(e) => { e.stopPropagation(); onSetSecond(); }}
+            title={task.isSecondPriority ? '次点を解除' : '次点に設定'}
+            style={{ fontSize: 13, padding: '4px 6px', minHeight: 36, color: task.isSecondPriority ? 'var(--text-primary)' : 'var(--text-muted)' }}
+          >☆</button>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            title="今日から外す"
+            style={{ fontSize: 13, padding: '4px 6px', minHeight: 36, color: 'var(--text-muted)' }}
+          >✕</button>
+        </div>
+      </div>
+    </div>
+  );
+}

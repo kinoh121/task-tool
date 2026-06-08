@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Replace with your actual Gmail address
+    function isAllowedUser() {
+      return request.auth != null
+        && request.auth.token.email == "kino.h121@gmail.com";
+    }
+
+    match /users/{userId} {
+      allow read, write: if isAllowedUser()
+        && request.auth.uid == userId;
+
+      match /{collection}/{docId} {
+        allow read, write: if isAllowedUser()
+          && request.auth.uid == userId;
+      }
+    }
+  }
+}
