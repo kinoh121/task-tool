@@ -12,8 +12,8 @@ interface Props {
   showAddToToday?: boolean;
 }
 
-export function TaskCard({ task, onEdit, showRemoveFromToday, showPriorityButtons, showAddToToday }: Props) {
-  const { completeTask, deleteTask, setTopPriority, setSecondPriority, removeFromToday, restoreTask, addToToday, updateTask } = useTaskContext();
+export function TaskCard({ task, onEdit, showPriorityButtons, showAddToToday }: Props) {
+  const { completeTask, deleteTask, setTopPriority, setSecondPriority, restoreTask, addToToday, updateTask } = useTaskContext();
 
   const handleChangePriority = (p: Priority) => updateTask(task.id, { priority: p });
   const [expanded, setExpanded] = useState(false);
@@ -123,12 +123,12 @@ export function TaskCard({ task, onEdit, showRemoveFromToday, showPriorityButton
               title="今日に追加済み"
             >✓今</span>
           )}
-          {task.status === 'active' && showRemoveFromToday && (
+          {task.status === 'active' && (
             <button
               className="btn btn-ghost btn-sm"
-              onClick={(e) => { e.stopPropagation(); removeFromToday(task.id); }}
-              title="今日から外す"
-              style={{ fontSize: 13, padding: '4px 6px', minHeight: 36, color: 'var(--text-muted)' }}
+              onClick={handleDelete}
+              title="削除"
+              style={{ fontSize: 16, padding: '4px 8px', minHeight: 36, color: 'var(--text-muted)' }}
             >✕</button>
           )}
           {task.status === 'completed' && (
@@ -140,14 +140,6 @@ export function TaskCard({ task, onEdit, showRemoveFromToday, showPriorityButton
             >↩ 戻す</button>
           )}
           {task.status !== 'active' && (
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={handleDelete}
-              title="削除"
-              style={{ fontSize: 16, padding: '4px 8px', minHeight: 36, color: 'var(--text-muted)' }}
-            >✕</button>
-          )}
-          {task.status === 'active' && !showRemoveFromToday && !showAddToToday && (
             <button
               className="btn btn-ghost btn-sm"
               onClick={handleDelete}

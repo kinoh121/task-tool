@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { Priority, Task } from '../../types';
 import { useTaskContext } from '../../contexts/TaskContext';
 import { TaskCard } from '../../components/task/TaskCard';
@@ -17,13 +17,26 @@ function formatTodayHeader(): string {
   return `${m}月${d}日（${w}）`;
 }
 
+function reorderArray(arr: Task[], fromId: string, toId: string): Task[] {
+  const result = [...arr];
+  const fromIdx = result.findIndex((t) => t.id === fromId);
+  const toIdx = result.findIndex((t) => t.id === toId);
+  if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return result;
+  const [moved] = result.splice(fromIdx, 1);
+  result.splice(toIdx, 0, moved);
+  return result;
+}
+
 export function TodayView() {
-  const { state, removeFromToday, completeTask, setTopPriority, setSecondPriority, updateTask, addTask } = useTaskContext();
+  const { state, deleteTask, completeTask, setTopPriority, setSecondPriority, updateTask, addTask, reorderTasks } = useTaskContext();
   const [showForm, setShowForm] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [showBulkAdd, setShowBulkAdd] = useState(false);
   const [bulkText, setBulkText] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
+
+  const dragId = useRef<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const todayTasks = state.tasks.filter((t) => t.status === 'active' && t.addedToToday);
   const top = getTopPriorityTask(todayTasks);
@@ -33,8 +46,25 @@ export function TodayView() {
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   const changePriority = (task: Task, p: Priority) => updateTask(task.id, { priority: p });
-
   const hasPriorityCards = top || second;
+
+  const handleDragStart = (id: string) => { dragId.current = id; };
+  const handleDragOver = (e: React.DragEvent, id: string) => { e.preventDefault(); setDragOverId(id); };
+  const handleDrop = (toId: string) => {
+    if (dragId.current && dragId.current !== toId) {
+      const reordered = reorderArray(restTasks, dragId.current, toId);
+      reorderTasks(reordered.map((t) => t.id));
+    }
+    dragId.current = null;
+    setDragOverId(null);
+  };
+  const handleDragEnd = () => { dragId.current = null; setDragOverId(null); };
+
+  const handleDeleteWithConfirm = async (id: string) => {
+    if (confirm('このタスクを削除しますか？')) {
+      await deleteTask(id);
+    }
+  };
 
   const handleBulkAdd = async () => {
     const lines = bulkText.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -53,7 +83,7 @@ export function TodayView() {
   };
 
   return (
-    <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px 16px' }}>
+    <div style={{ maxWidth: 720, padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700 }}>今日のタスク</h1>
@@ -82,7 +112,7 @@ export function TodayView() {
               rank="top"
               onEdit={() => setEditTask(top)}
               onComplete={() => completeTask(top.id)}
-              onRemove={() => removeFromToday(top.id)}
+              onDelete={() => handleDeleteWithConfirm(top.id)}
               onSetTop={() => setTopPriority(top.id)}
               onSetSecond={() => setSecondPriority(top.id)}
               onChangePriority={(p) => changePriority(top, p)}
@@ -95,7 +125,7 @@ export function TodayView() {
               rank="second"
               onEdit={() => setEditTask(second)}
               onComplete={() => completeTask(second.id)}
-              onRemove={() => removeFromToday(second.id)}
+              onDelete={() => handleDeleteWithConfirm(second.id)}
               onSetTop={() => setTopPriority(second.id)}
               onSetSecond={() => setSecondPriority(second.id)}
               onChangePriority={(p) => changePriority(second, p)}
@@ -109,7 +139,20 @@ export function TodayView() {
           {restTasks.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {restTasks.map((t) => (
-                <TaskCard key={t.id} task={t} onEdit={setEditTask} showRemoveFromToday showPriorityButtons />
+                <div
+                  key={t.id}
+                  draggable
+                  onDragStart={() => handleDragStart(t.id)}
+                  onDragOver={(e) => handleDragOver(e, t.id)}
+                  onDrop={() => handleDrop(t.id)}
+                  onDragEnd={handleDragEnd}
+                  style={{
+                    borderTop: dragOverId === t.id && dragId.current !== t.id ? '2px solid var(--accent)' : '2px solid transparent',
+                    cursor: 'grab',
+                  }}
+                >
+                  <TaskCard task={t} onEdit={setEditTask} showRemoveFromToday showPriorityButtons />
+                </div>
               ))}
             </div>
           )}
@@ -184,13 +227,13 @@ interface PriorityCardProps {
   rank: 'top' | 'second';
   onEdit: () => void;
   onComplete: () => void;
-  onRemove: () => void;
+  onDelete: () => void;
   onSetTop: () => void;
   onSetSecond: () => void;
   onChangePriority: (p: Priority) => void;
 }
 
-function PriorityCard({ task, rank, onEdit, onComplete, onRemove, onSetTop, onSetSecond, onChangePriority }: PriorityCardProps) {
+function PriorityCard({ task, rank, onEdit, onComplete, onDelete, onSetTop, onSetSecond, onChangePriority }: PriorityCardProps) {
   const [expanded, setExpanded] = useState(false);
   const isTop = rank === 'top';
 
@@ -257,8 +300,8 @@ function PriorityCard({ task, rank, onEdit, onComplete, onRemove, onSetTop, onSe
           >☆</button>
           <button
             className="btn btn-ghost btn-sm"
-            onClick={(e) => { e.stopPropagation(); onRemove(); }}
-            title="今日から外す"
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            title="削除"
             style={{ fontSize: 13, padding: '4px 6px', minHeight: 36, color: 'var(--text-muted)' }}
           >✕</button>
         </div>

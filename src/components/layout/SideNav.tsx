@@ -8,13 +8,17 @@ export function SideNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const { handleSignOut } = useAuth();
-  const { state: taskState, addGroup, addList, deleteGroup, deleteList } = useTaskContext();
+  const { state: taskState, addGroup, updateGroup, addList, updateList, deleteGroup, deleteList } = useTaskContext();
   const { state: appState, dispatch } = useAppState();
 
   const [addingGroup, setAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [addingListForGroup, setAddingListForGroup] = useState<string | null>(null);
   const [newListName, setNewListName] = useState('');
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editGroupName, setEditGroupName] = useState('');
+  const [editingListId, setEditingListId] = useState<string | null>(null);
+  const [editListName, setEditListName] = useState('');
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -37,6 +41,20 @@ export function SideNav() {
       dispatch({ type: 'TOGGLE_GROUP', groupId });
     }
     navigate('/lists');
+  };
+
+  const handleEditGroup = async (e: React.FormEvent, id: string) => {
+    e.preventDefault();
+    if (!editGroupName.trim()) return;
+    await updateGroup(id, editGroupName.trim());
+    setEditingGroupId(null);
+  };
+
+  const handleEditList = async (e: React.FormEvent, id: string) => {
+    e.preventDefault();
+    if (!editListName.trim()) return;
+    await updateList(id, editListName.trim());
+    setEditingListId(null);
   };
 
   const navItem = (path: string, label: string) => (
@@ -125,39 +143,64 @@ export function SideNav() {
           return (
             <div key={group.id}>
               <div style={{ display: 'flex', alignItems: 'center' }}>
-                <button
-                  onClick={() => dispatch({ type: 'TOGGLE_GROUP', groupId: group.id })}
-                  style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '6px 8px 6px 28px',
-                    textAlign: 'left',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: 'var(--text-muted)',
-                    minHeight: 32,
-                    transition: 'color 0.15s',
-                  }}
-                >
-                  <span style={{ fontSize: 9 }}>{isOpen ? '▼' : '▶'}</span>
-                  <span style={{ flex: 1 }}>{group.name}</span>
-                </button>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => setAddingListForGroup(group.id)}
-                  title="リスト追加"
-                  style={{ fontSize: 14, padding: '2px 6px', minHeight: 28, color: 'var(--text-muted)' }}
-                >+</button>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => {
-                    if (confirm(`グループ「${group.name}」を削除しますか？`)) deleteGroup(group.id);
-                  }}
-                  title="グループ削除"
-                  style={{ fontSize: 12, padding: '2px 6px', minHeight: 28, color: 'var(--text-muted)', marginRight: 4 }}
-                >✕</button>
+                {editingGroupId === group.id ? (
+                  <form onSubmit={(e) => handleEditGroup(e, group.id)} style={{ flex: 1, padding: '4px 8px 4px 28px' }}>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <input
+                        value={editGroupName}
+                        onChange={(e) => setEditGroupName(e.target.value)}
+                        autoFocus
+                        style={{ flex: 1, fontSize: 12, padding: '4px 6px' }}
+                      />
+                      <button type="submit" className="btn btn-primary btn-sm" style={{ padding: '4px 6px', minHeight: 24, fontSize: 11 }}>✓</button>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditingGroupId(null)} style={{ minHeight: 24, fontSize: 11 }}>✕</button>
+                    </div>
+                  </form>
+                ) : (
+                  <button
+                    onClick={() => dispatch({ type: 'TOGGLE_GROUP', groupId: group.id })}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '6px 8px 6px 28px',
+                      textAlign: 'left',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: 'var(--text-muted)',
+                      minHeight: 32,
+                      transition: 'color 0.15s',
+                    }}
+                  >
+                    <span style={{ fontSize: 9 }}>{isOpen ? '▼' : '▶'}</span>
+                    <span style={{ flex: 1 }}>{group.name}</span>
+                  </button>
+                )}
+                {editingGroupId !== group.id && (
+                  <>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => { setEditingGroupId(group.id); setEditGroupName(group.name); }}
+                      title="グループ名を変更"
+                      style={{ fontSize: 11, padding: '2px 4px', minHeight: 28, color: 'var(--text-muted)' }}
+                    >✎</button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setAddingListForGroup(group.id)}
+                      title="リスト追加"
+                      style={{ fontSize: 14, padding: '2px 6px', minHeight: 28, color: 'var(--text-muted)' }}
+                    >+</button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        if (confirm(`グループ「${group.name}」を削除しますか？`)) deleteGroup(group.id);
+                      }}
+                      title="グループ削除"
+                      style={{ fontSize: 12, padding: '2px 6px', minHeight: 28, color: 'var(--text-muted)', marginRight: 4 }}
+                    >✕</button>
+                  </>
+                )}
               </div>
 
               {addingListForGroup === group.id && (
@@ -180,34 +223,59 @@ export function SideNav() {
                 const listActive = appState.selectedListId === list.id && isActive('/lists');
                 return (
                   <div key={list.id} style={{ display: 'flex', alignItems: 'center' }}>
-                    <button
-                      onClick={() => {
-                        dispatch({ type: 'SELECT_LIST', listId: list.id });
-                        navigate('/lists');
-                      }}
-                      style={{
-                        flex: 1,
-                        display: 'block',
-                        padding: '6px 8px 6px 40px',
-                        textAlign: 'left',
-                        fontSize: 13,
-                        color: listActive ? 'var(--accent)' : 'var(--text-secondary)',
-                        background: listActive ? 'var(--accent)0d' : 'transparent',
-                        borderLeft: `2px solid ${listActive ? 'var(--accent)' : 'transparent'}`,
-                        minHeight: 34,
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      {list.name}
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => {
-                        if (confirm(`リスト「${list.name}」を削除しますか？`)) deleteList(list.id);
-                      }}
-                      title="リスト削除"
-                      style={{ fontSize: 12, padding: '2px 6px', minHeight: 28, color: 'var(--text-muted)', marginRight: 4 }}
-                    >✕</button>
+                    {editingListId === list.id ? (
+                      <form onSubmit={(e) => handleEditList(e, list.id)} style={{ flex: 1, padding: '4px 8px 4px 40px' }}>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <input
+                            value={editListName}
+                            onChange={(e) => setEditListName(e.target.value)}
+                            autoFocus
+                            style={{ flex: 1, fontSize: 12, padding: '4px 6px' }}
+                          />
+                          <button type="submit" className="btn btn-primary btn-sm" style={{ padding: '4px 6px', minHeight: 24, fontSize: 11 }}>✓</button>
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditingListId(null)} style={{ minHeight: 24, fontSize: 11 }}>✕</button>
+                        </div>
+                      </form>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          dispatch({ type: 'SELECT_LIST', listId: list.id });
+                          navigate('/lists');
+                        }}
+                        style={{
+                          flex: 1,
+                          display: 'block',
+                          padding: '6px 8px 6px 40px',
+                          textAlign: 'left',
+                          fontSize: 13,
+                          color: listActive ? 'var(--accent)' : 'var(--text-secondary)',
+                          background: listActive ? 'var(--accent)0d' : 'transparent',
+                          borderLeft: `2px solid ${listActive ? 'var(--accent)' : 'transparent'}`,
+                          minHeight: 34,
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {list.name}
+                      </button>
+                    )}
+                    {editingListId !== list.id && (
+                      <>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => { setEditingListId(list.id); setEditListName(list.name); }}
+                          title="リスト名を変更"
+                          style={{ fontSize: 11, padding: '2px 4px', minHeight: 28, color: 'var(--text-muted)' }}
+                        >✎</button>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => {
+                            if (confirm(`リスト「${list.name}」を削除しますか？`)) deleteList(list.id);
+                          }}
+                          title="リスト削除"
+                          style={{ fontSize: 12, padding: '2px 6px', minHeight: 28, color: 'var(--text-muted)', marginRight: 4 }}
+                        >✕</button>
+                      </>
+                    )}
                   </div>
                 );
               })}

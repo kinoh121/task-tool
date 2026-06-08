@@ -18,16 +18,14 @@ function reorderArray(arr: Task[], fromId: string, toId: string): Task[] {
 
 export function ListView() {
   const { state, reorderTasks, addTask } = useTaskContext();
-  const { state: appState } = useAppState();
+  const { state: appState, dispatch } = useAppState();
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showBulkAdd, setShowBulkAdd] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
 
-  // ドラッグ状態
   const dragId = useRef<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
-  // 複数追加テキスト
   const [bulkText, setBulkText] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
 
@@ -68,8 +66,40 @@ export function ListView() {
 
   if (!selectedList) {
     return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-        左のメニューからリストを選択してください
+      <div style={{ padding: '20px 24px' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20 }}>リストを選択</h2>
+        {state.groups.map((group) => {
+          const groupLists = state.lists.filter((l) => l.groupId === group.id);
+          if (groupLists.length === 0) return null;
+          return (
+            <div key={group.id} style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {group.name}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {groupLists.map((list) => (
+                  <button
+                    key={list.id}
+                    onClick={() => dispatch({ type: 'SELECT_LIST', listId: list.id })}
+                    style={{
+                      width: '100%', textAlign: 'left', padding: '12px 16px',
+                      background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius)', fontSize: 14, color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {list.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        {state.groups.length === 0 && (
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0' }}>
+            リストがありません
+          </div>
+        )}
       </div>
     );
   }

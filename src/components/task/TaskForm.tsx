@@ -11,6 +11,7 @@ interface Props {
 }
 
 const PRIORITIES: Priority[] = ['S', 'A', 'B', 'C', 'D'];
+const TODAY_ID = '__today__';
 
 export function TaskForm({ lists, defaultListId, defaultAddToToday, task, onClose }: Props) {
   const { addTask, updateTask, duplicateTask } = useTaskContext();
@@ -18,18 +19,28 @@ export function TaskForm({ lists, defaultListId, defaultAddToToday, task, onClos
   const [detail, setDetail] = useState(task?.detail || '');
   const [priority, setPriority] = useState<Priority>(task?.priority || 'C');
   const [dueDate, setDueDate] = useState(task?.dueDate || '');
-  const [listId, setListId] = useState(task?.listId || defaultListId || (lists[0]?.id ?? ''));
+  const [listId, setListId] = useState<string>(() => {
+    if (task?.addedToToday || defaultAddToToday) return TODAY_ID;
+    return task?.listId || defaultListId || (lists[0]?.id ?? '');
+  });
   const [saving, setSaving] = useState(false);
+
+  const resolveListId = () => {
+    if (listId === TODAY_ID) return task?.listId || (lists[0]?.id ?? '');
+    return listId;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
     setSaving(true);
+    const addedToToday = listId === TODAY_ID;
+    const resolvedListId = resolveListId();
     try {
       if (task) {
-        await updateTask(task.id, { content, detail, priority, dueDate: dueDate || null, listId });
+        await updateTask(task.id, { content, detail, priority, dueDate: dueDate || null, listId: resolvedListId, addedToToday });
       } else {
-        await addTask({ content, detail, priority, dueDate: dueDate || null, listId, addedToToday: defaultAddToToday ?? false });
+        await addTask({ content, detail, priority, dueDate: dueDate || null, listId: resolvedListId, addedToToday });
       }
       onClose();
     } finally {
@@ -101,18 +112,17 @@ export function TaskForm({ lists, defaultListId, defaultAddToToday, task, onClos
           />
         </div>
       </div>
-      {lists.length > 0 && (
-        <div>
-          <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-            リスト
-          </label>
-          <select value={listId} onChange={(e) => setListId(e.target.value)}>
-            {lists.map((l) => (
-              <option key={l.id} value={l.id}>{l.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
+      <div>
+        <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+          リスト
+        </label>
+        <select value={listId} onChange={(e) => setListId(e.target.value)}>
+          <option value={TODAY_ID}>今日</option>
+          {lists.map((l) => (
+            <option key={l.id} value={l.id}>{l.name}</option>
+          ))}
+        </select>
+      </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
         {task && (
           <button
