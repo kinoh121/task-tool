@@ -4,6 +4,7 @@ const TABS = [
   { path: '/', label: '今日', icon: '○' },
   { path: '/lists', label: 'リスト', icon: '≡' },
   { path: '/completed', label: '完了', icon: '✓' },
+  { path: '/past', label: '過去', icon: '◷' },
   { path: '/archive', label: 'アーカイブ', icon: '□' },
 ];
 

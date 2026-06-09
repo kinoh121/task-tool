@@ -4,7 +4,18 @@ import { useAppState } from '../../contexts/AppContext';
 import { TaskCard } from '../../components/task/TaskCard';
 import { TaskForm } from '../../components/task/TaskForm';
 import { Modal } from '../../components/ui/Modal';
+import { useTouchSortable } from '../../hooks/useTouchSortable';
 import type { Task } from '../../types';
+
+function downloadMd(filename: string, content: string) {
+  const blob = new Blob([content], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function reorderArray(arr: Task[], fromId: string, toId: string): Task[] {
   const result = [...arr];
@@ -19,6 +30,7 @@ function reorderArray(arr: Task[], fromId: string, toId: string): Task[] {
 export function ListView() {
   const { state, reorderTasks, addTask } = useTaskContext();
   const { state: appState, dispatch } = useAppState();
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showBulkAdd, setShowBulkAdd] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -48,6 +60,30 @@ export function ListView() {
   };
   const handleDragEnd = () => { dragId.current = null; setDragOverId(null); };
 
+  const getDragBorder = (taskId: string) => {
+    if (dragOverId !== taskId || !dragId.current || dragId.current === taskId) return { borderTop: '2px solid transparent', borderBottom: '2px solid transparent' };
+    const fromIdx = listTasks.findIndex(t => t.id === dragId.current);
+    const toIdx = listTasks.findIndex(t => t.id === taskId);
+    return fromIdx < toIdx
+      ? { borderTop: '2px solid transparent', borderBottom: '2px solid var(--accent)' }
+      : { borderTop: '2px solid var(--accent)', borderBottom: '2px solid transparent' };
+  };
+
+  const { containerRef: touchContainerRef, handleTouchStart, getTouchDragBorder, draggingId } = useTouchSortable(
+    listTasks,
+    (ids) => reorderTasks(ids),
+    isMobile,
+  );
+
+  const handleExport = () => {
+    if (!selectedList) return;
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const lines = listTasks.map((t) => `- [ ] ${t.content}`).join('\n');
+    const content = `${lines}\n`;
+    downloadMd(`${selectedList.name}_${dateStr}.md`, content);
+  };
+
   const handleBulkAdd = async () => {
     if (!appState.selectedListId) return;
     const lines = bulkText.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -65,6 +101,7 @@ export function ListView() {
   };
 
   if (!selectedList) {
+    if (!isMobile) return <div style={{ flex: 1 }} />;
     return (
       <div style={{ padding: '20px 24px' }}>
         <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20 }}>リストを選択</h2>
@@ -106,9 +143,33 @@ export function ListView() {
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', maxWidth: 720 }}>
+      {/* モバイル：左下固定の戻るボタン */}
+      {isMobile && (
+        <button
+          onClick={() => dispatch({ type: 'SELECT_LIST', listId: null })}
+          style={{
+            position: 'fixed',
+            bottom: 'calc(var(--nav-height) + var(--safe-bottom) + 12px)',
+            left: 16,
+            zIndex: 100,
+            background: 'var(--bg-tertiary)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            padding: '10px 16px',
+            fontSize: 14,
+            color: 'var(--text-secondary)',
+            boxShadow: 'var(--shadow)',
+          }}
+        >← 戻る</button>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 600 }}>{selectedList.name}</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600 }}>{selectedList.name}</h2>
+        </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost btn-sm" onClick={handleExport} disabled={listTasks.length === 0}>
+            出力
+          </button>
           <button className="btn btn-ghost btn-sm" onClick={() => setShowBulkAdd(true)}>
             複数追加
           </button>
@@ -123,22 +184,29 @@ export function ListView() {
           タスクはありません
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div ref={touchContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {listTasks.map((t) => (
             <div
               key={t.id}
-              draggable
-              onDragStart={() => handleDragStart(t.id)}
-              onDragOver={(e) => handleDragOver(e, t.id)}
-              onDrop={() => handleDrop(t.id)}
-              onDragEnd={handleDragEnd}
+              data-sortid={t.id}
+              draggable={!isMobile}
+              onDragStart={!isMobile ? () => handleDragStart(t.id) : undefined}
+              onDragOver={!isMobile ? (e) => handleDragOver(e, t.id) : undefined}
+              onDrop={!isMobile ? () => handleDrop(t.id) : undefined}
+              onDragEnd={!isMobile ? handleDragEnd : undefined}
+              onTouchStart={isMobile ? (e) => handleTouchStart(t.id, e) : undefined}
               style={{
-                opacity: dragId.current === t.id ? 0.4 : 1,
-                borderTop: dragOverId === t.id && dragId.current !== t.id ? '2px solid var(--accent)' : '2px solid transparent',
-                cursor: 'grab',
+                opacity: isMobile ? (draggingId === t.id ? 0.3 : 1) : (dragId.current === t.id ? 0.4 : 1),
+                ...(isMobile ? getTouchDragBorder(t.id) : getDragBorder(t.id)),
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                userSelect: isMobile ? 'none' : undefined,
               }}
             >
-              <TaskCard task={t} onEdit={setEditTask} showAddToToday />
+              <div style={{ flex: 1, minWidth: 0, cursor: isMobile ? 'default' : 'grab' }}>
+                <TaskCard task={t} onEdit={setEditTask} showAddToToday />
+              </div>
             </div>
           ))}
         </div>

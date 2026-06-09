@@ -1,139 +1,135 @@
-# HANDOFF.md — タスク管理PWA 引き継ぎメモ
+# HANDOFF.md — TaskTool プロジェクト引き継ぎ
+
+最終更新: 2026-06-09
+
+---
 
 ## プロジェクト概要
 
-個人用タスク管理PWA。React 19 + TypeScript + Vite + Firebase (Firestore/Auth) + GitHub Pages。
-デモモード (`VITE_DEMO_MODE=true`) でFirebaseなしに動作確認可能。
+個人用タスク管理PWA。
 
-**ディレクトリ**: `C:\Users\kinoh\task-tool`
+- **URL**: https://kinoh121.github.io/task-tool/
+- **リポジトリ**: https://github.com/kinoh121/task-tool
+- **開発ディレクトリ**: `C:\Root\task-tool`
+- **Firebase プロジェクト**: `tasktool-f000f`
+- **アクセス制限**: `kino.h121@gmail.com` のみ（Firestore rules + Auth）
+
+## 技術スタック
+
+- React 19 + TypeScript + Vite 8（rolldownバンドラー）
+- Firebase: Firestore + Google Authentication
+- GitHub Pages（`gh-pages`パッケージでデプロイ）
+- PWA: **無効化**（Vite 8 rolldown の非ASCII path バグのため `vite-plugin-pwa` を外した）
+
+---
+
+## 重要な決定事項
+
+### なぜ C:\Root\task-tool か
+- 元々 `G:/マイドライブ/...`（Google Drive同期フォルダ）にあった
+- Vite 8 の rolldown が非ASCII文字パス（`マイドライブ`）でビルドエラーを起こす
+- → `C:\Root\task-tool` に移動して解決
+- `G:\マイドライブ\work\Obsidian\ClaudeCode\TaskTool\task-tool` は削除済み
+
+### Obsidian連携方式
+- ~~Obsidian Local REST API~~ → HTTPSからlocalhostへのMixed Contentで不可
+- **採用**: ブラウザのダウンロード先をObsidianのVaultフォルダに設定した専用ブラウザ（Firefox等）でtask toolを使う
+- task toolはEdgeでは使わず、専用ブラウザに限定する
 
 ---
 
 ## 現在の実装状態（完了済み）
 
-### データモデル (`src/types/index.ts`)
-```typescript
-interface Task {
-  id, content, detail, priority: 'S'|'A'|'B'|'C'|'D'
-  dueDate: string | null, listId, status: 'active'|'completed'|'archived'
-  order: number                  // DnD並び替え用
-  addedToToday: boolean          // 今日ビュー/リストビューの分離
-  isTopPriority, isSecondPriority: boolean
-  completedAt, archivedAt, createdAt: Date | null
-  copiedFromId: string | null
-}
-```
+### Firebase本番セットアップ ✅
+- Google認証
+- Firestoreデータ永続化
+- セキュリティルール（`kino.h121@gmail.com`のみ）
+- 本番URLをAuthorized domainsに追加済み
 
-### 実装済み機能
-| 機能 | ファイル |
-|------|---------|
-| 今日ビュー（日付・曜日表示、最重要/次点カード） | `src/views/TodayView/index.tsx` |
-| リストビュー（DnD並び替え、グループ/リスト選択） | `src/views/ListView/index.tsx` |
-| 完了ビュー | `src/views/CompletedView/index.tsx` |
-| アーカイブビュー | `src/views/ArchiveView/index.tsx` |
-| 過去ビュー（3ヶ月分、日付ナビ） | `src/views/PastView/index.tsx` |
-| サイドナビ（グループ/リスト管理、ツリー表示） | `src/components/layout/SideNav.tsx` |
-| タスクカード | `src/components/task/TaskCard.tsx` |
-| タスクフォーム（編集・コピー機能） | `src/components/task/TaskForm.tsx` |
-| 優先度バッジ（クリックでドロップダウン変更） | `src/components/task/PriorityBadge.tsx` |
-| デモデータ | `src/demo/demoData.ts` |
+### GitHub Pages デプロイ ✅
+- `npm run deploy` でデプロイ
+- `vite.config.ts`: base = `/task-tool/`（本番のみ）
+- `package.json`: homepage = `https://kinoh121.github.io/task-tool`
 
-### 今日ビューの主要仕様
-- ヘッダー: 「今日のタスク」＋「M月D日（曜日）」
-- 最重要タスク: オレンジ背景 `rgba(255,110,30,0.10)`、★ボタンで設定/解除（トグル）
-- 次点タスク: 黄色背景 `rgba(220,180,0,0.10)`、☆ボタンで設定/解除（トグル）
-- 優先カードとその他の間にセパレーター
-- 複数追加ボタン（`addedToToday: true`, 優先度A, `state.lists[0]`に追加）
-- 下部に「＋」ダッシュボタン
+### UI/機能改善 ✅（7項目）
+1. **グループ名変更** — SideNavの✎ボタンでインライン編集
+2. **リスト名変更** — SideNavの✎ボタンでインライン編集
+3. **モバイルでリスト選択画面** — 未選択時にグループ/リストツリーを表示
+4. **今日ビューの左寄せ** — `margin: '0 auto'` 削除
+5. **「今日」リスト選択肢** — TaskFormのリストセレクターに `TODAY_ID = '__today__'` を追加
+6. **今日タスクのDnD** — restTasksのドラッグ&ドロップ並び替え
+7. **削除ボタン + 確認ダイアログ** — 全タスクに✕ボタン、`confirm()`で確認
 
-### リストビューの主要仕様
-- `addedToToday: false` のタスクのみ表示（今日ビューと分離）
-- `order` フィールドでソート、HTML5 DnDで並び替え
-- 複数追加ボタン（優先度A、選択中リストに追加）
-- 下部に「＋」ダッシュボタン
-
-### ナビゲーション順序
-今日 → リスト → 完了 → 過去 → アーカイブ → ログアウト
+### Obsidian出力機能 ✅
+- **今日ビュー**: 「出力」ボタン → `YYYY-MM-DD.md`
+  - 最重要→次点→その他の順
+  - ヘッダー: `# 今日のタスク YYYY-MM-DD`
+  - チェックボックス形式: `- [ ] タスク内容`（優先度なし）
+- **リストビュー**: 「出力」ボタン → `{リスト名}_YYYY-MM-DD.md`
+  - ヘッダー: `# {リスト名} YYYY-MM-DD`
+  - 同形式
 
 ---
 
-## 重要な技術的決定事項
+## ファイル構成（主要ファイル）
 
-### HMRステートキャッシュ問題
-- 状態の形が変わった場合（例: `selectedGroupId` → `openGroupIds`）、HMRが古い状態を保持してクラッシュ
-- 対策: Reducerに `state.openGroupIds ?? []` の防衛的チェックを追加＋ページリロード
+```
+C:\Root\task-tool\
+├── src/
+│   ├── components/
+│   │   ├── layout/SideNav.tsx        # グループ/リスト管理、名前編集
+│   │   └── task/
+│   │       ├── TaskCard.tsx          # タスクカード、削除確認
+│   │       └── TaskForm.tsx          # フォーム（「今日」選択肢付き）
+│   ├── contexts/
+│   │   ├── AuthContext.tsx           # Google認証
+│   │   └── TaskContext.tsx           # Firestoreデータ管理
+│   ├── views/
+│   │   ├── TodayView/index.tsx       # 今日ビュー（DnD、Obsidian出力）
+│   │   └── ListView/index.tsx        # リストビュー（モバイル対応、Obsidian出力）
+│   └── demo/DemoProviders.tsx        # デモモード
+├── firestore.rules                   # アクセス制限ルール
+├── vite.config.ts                    # base設定、PWA無効
+├── .env.local                        # Firebase設定（gitignore済み）
+└── package.json
+```
 
-### `verbatimModuleSyntax` (tsconfig)
-- 型のみのimportは必ず `import type` を使う必要あり
-
-### 優先度変更時の順序保持
-- `updateTask` で優先度変更しても `order` を更新しない → 位置が変わらない
-
-### 優先度の自動アサインなし
-- `isTopPriority`/`isSecondPriority` はユーザーが明示的にセットするのみ
-- 未設定なら優先カードは表示されない
+### .env.local の内容
+```
+VITE_DEMO_MODE=false
+VITE_FIREBASE_API_KEY=AIzaSyCOHgDkw4y36EJw41yUDe7kj5W6WwEcRd0
+VITE_FIREBASE_AUTH_DOMAIN=tasktool-f000f.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=tasktool-f000f
+VITE_FIREBASE_STORAGE_BUCKET=tasktool-f000f.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=1034396656526
+VITE_FIREBASE_APP_ID=1:1034396656526:web:36acf24a707027d3ef7adf
+```
 
 ---
 
-## 未実装・今後の作業
+## デプロイ手順
 
-### Firebase本番セットアップ（未着手）
-1. Firebaseプロジェクト作成（Firestore + Google Auth有効化）
-2. `.env.local` にFirebase設定値を記入（`.env.example` を参照）
-3. `src/firebase.ts` の設定確認
-4. `firestore.rules` の `YOUR_EMAIL@gmail.com` を実際のアドレスに変更
-5. `firebase deploy --only firestore:rules`
+```powershell
+cd C:\Root\task-tool
+npm run deploy
+```
 
-### GitHub Pagesデプロイ（未着手）
-1. `vite.config.ts` の `base` をリポジトリ名に変更
-2. `package.json` の `homepage` を設定
-3. `npm run deploy`（gh-pagesパッケージ使用）
-
-### 日付切り替えロジック（未実装）
-- `useDailyCheck.ts`: 前回アクセス日と今日が異なる場合、activeタスクをすべてarchivedに変更
-- `/copy` ルートの `CopySelectionView`: アーカイブされたタスクからコピー選択
-
-### モバイル対応（部分的）
-- BottomNav（モバイル用）は未実装
-- SideNavのみ（デスクトップ想定）
-
-### PWA設定確認
-- `vite-plugin-pwa` は設定済みだが、本番ビルドでのServiceWorker動作は未確認
+ビルド → `gh-pages` ブランチへ自動プッシュ → GitHub Pagesに反映（1〜2分）
 
 ---
 
-## 開発コマンド
+## 既知の問題・制限
 
-```bash
-cd C:\Users\kinoh\task-tool
-npm run dev          # デモモードで起動（VITE_DEMO_MODE=true が .env.local に設定済みのはず）
-npm run build        # 本番ビルド
-npm run deploy       # GitHub Pagesにデプロイ（gh-pagesが必要）
-```
-
-デモモードの確認: `.env.local` に `VITE_DEMO_MODE=true` があればFirebase不要で動作。
+- **PWA無効**: Vite 8 rolldownバグのため。将来Viteが修正されれば再有効化可能
+- **DnD**: HTML5 Drag and Drop API使用。モバイルタッチ非対応
+- **Obsidian出力**: ファイルはダウンロードフォルダへ保存。専用ブラウザのデフォルトダウンロード先をObsidian Vaultに設定して使う
 
 ---
 
-## ファイル構成（主要ファイルのみ）
+## 次にやること（候補）
 
-```
-src/
-├── App.tsx                          # ルート定義（HashRouter）
-├── types/index.ts                   # 全型定義
-├── contexts/
-│   ├── AppContext.tsx                # UI状態（selectedListId, openGroupIds）
-│   └── TaskContext.tsx              # タスクCRUD（Demo/Real両プロバイダ）
-├── demo/demoData.ts                 # デモ用初期データ
-├── views/
-│   ├── TodayView/index.tsx
-│   ├── ListView/index.tsx
-│   ├── CompletedView/index.tsx
-│   ├── ArchiveView/index.tsx
-│   └── PastView/index.tsx
-├── components/
-│   ├── layout/SideNav.tsx
-│   ├── task/{TaskCard,TaskForm,PriorityBadge}.tsx
-│   └── ui/Modal.tsx
-└── utils/{dateUtils,priorityUtils,priorityColors}.ts
-```
+特に決定事項なし。ユーザーからの要望待ち。考えられる改善案:
+- モバイルタッチDnD対応
+- タスク完了後のアーカイブ自動化
+- PWA再有効化（Vite修正後）
+- リスト横断でのタスク検索
