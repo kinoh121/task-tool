@@ -1,4 +1,13 @@
-export type Priority = 'S' | 'A' | 'B' | 'C' | 'D';
+export type Priority = 'S' | 'A' | 'B' | 'C' | 'D' | 'none';
+
+export interface ScheduleItem {
+  id: string;
+  label: string;
+  time: string;       // "HH:MM" (10分刻み)
+  priority: Priority;
+  taskId: string | null;
+  createdAt: Date;
+}
 export type TaskStatus = 'active' | 'completed' | 'archived';
 
 export interface Group {
@@ -24,11 +33,12 @@ export interface Task {
   dueDate: string | null;
   listId: string;
   status: TaskStatus;
-  addedToToday: boolean;      // trueのタスクだけが今日ビューに表示される
+  todayDate: string | null;    // "YYYY-MM-DD" の日付と一致するタスクが今日ビューに表示される
   isTopPriority: boolean;
   isSecondPriority: boolean;
   completedAt: Date | null;
   archivedAt: Date | null;
+  wasInToday?: boolean;
   order: number;
   createdAt: Date;
   copiedFromId: string | null;

@@ -1,73 +1,139 @@
 # HANDOFF.md — TaskTool プロジェクト引き継ぎ
 
-最終更新: 2026-06-09
+最終更新: 2026-06-10
 
 ---
 
 ## プロジェクト概要
 
-個人用タスク管理PWA。
+個人用タスク管理SPA（シングルユーザー）。
 
 - **URL**: https://kinoh121.github.io/task-tool/
 - **リポジトリ**: https://github.com/kinoh121/task-tool
 - **開発ディレクトリ**: `C:\Root\task-tool`
 - **Firebase プロジェクト**: `tasktool-f000f`
-- **アクセス制限**: `kino.h121@gmail.com` のみ（Firestore rules + Auth）
+- **アクセス制限**: `kino.h121@gmail.com` のみ（Firestore rules + Google Auth）
 
 ## 技術スタック
 
 - React 19 + TypeScript + Vite 8（rolldownバンドラー）
 - Firebase: Firestore + Google Authentication
-- GitHub Pages（`gh-pages`パッケージでデプロイ）
-- PWA: **無効化**（Vite 8 rolldown の非ASCII path バグのため `vite-plugin-pwa` を外した）
+- GitHub Pages（`npm run deploy` → `gh-pages -d dist`）
+- PWA: **無効化**（Vite 8 rolldown の非ASCII path バグのため）
 
 ---
 
 ## 重要な決定事項
 
-### なぜ C:\Root\task-tool か
+### パスの問題
 - 元々 `G:/マイドライブ/...`（Google Drive同期フォルダ）にあった
-- Vite 8 の rolldown が非ASCII文字パス（`マイドライブ`）でビルドエラーを起こす
-- → `C:\Root\task-tool` に移動して解決
-- `G:\マイドライブ\work\Obsidian\ClaudeCode\TaskTool\task-tool` は削除済み
+- Vite 8 の rolldown が非ASCII文字パス（`マイドライブ`）でビルドエラー
+- → `C:\Root\task-tool` に移動して解決（元パスは削除済み）
 
-### Obsidian連携方式
-- ~~Obsidian Local REST API~~ → HTTPSからlocalhostへのMixed Contentで不可
-- **採用**: ブラウザのダウンロード先をObsidianのVaultフォルダに設定した専用ブラウザ（Firefox等）でtask toolを使う
-- task toolはEdgeでは使わず、専用ブラウザに限定する
+### 引き継ぎ機能のアーキテクチャ（重要）
+- **旧設計の失敗**: `archiveTasks(全activeタスク)` で全タスクをアーカイブ → タスク消失バグを繰り返した
+- **現在の設計（スナップショット方式）**:
+  - 引き継ぎ時はタスクを**アーカイブしない**。`addedToToday: false` にするだけ
+  - `users/{uid}/dailySnapshots/{YYYY-MM-DD}` に当日の今日タスクIDを記録
+  - `users/{uid}.lastCopyDate` で1日1回制限を管理
+  - 過去ビューはスナップショットを参照する
+
+### アーカイブ機能
+- アーカイブ（archive）ページは**削除済み**（完了と機能重複のため）
+- `archiveTasks()` 関数はTaskContextに残っているが、**引き継ぎフローからは使わない**
+- アーカイブされたタスクが存在する場合は今日ビューに「⚠ 復元」ボタンが表示される
+
+### GAS / 通知
+- GASによるAM8時 Gmail通知は設定済み（task-toolのURL付き）
+- アプリ側のチェックはAM6時以降に起動した場合に自動実行
+- Google Calendar繰り返しイベントでの通知も利用可能
 
 ---
 
-## 現在の実装状態（完了済み）
+## Firestoreデータ構造
 
-### Firebase本番セットアップ ✅
-- Google認証
-- Firestoreデータ永続化
-- セキュリティルール（`kino.h121@gmail.com`のみ）
-- 本番URLをAuthorized domainsに追加済み
+```
+users/{uid}/
+  ├── tasks/{id}              # タスク本体
+  │     content, detail, priority, dueDate, listId
+  │     status: 'active' | 'completed' | 'archived'
+  │     addedToToday: bool    # 今日ビューに表示中か
+  │     wasInToday: bool      # 完了/アーカイブ時に今日にいたか（新フィールド）
+  │     isTopPriority: bool
+  │     isSecondPriority: bool
+  │     order, copiedFromId, createdAt, completedAt, archivedAt
+  │
+  ├── groups/{id}             # グループ（リストの親）
+  ├── lists/{id}              # リスト
+  │
+  ├── scheduleItems/{id}      # スケジュール（日付概念なし）
+  │     label, time (HH:MM), priority, taskId, createdAt
+  │
+  └── dailySnapshots/{YYYY-MM-DD}   # 日次スナップショット
+        taskIds: string[]            # その日の今日タスクID一覧
+        createdAt: Timestamp
 
-### GitHub Pages デプロイ ✅
-- `npm run deploy` でデプロイ
-- `vite.config.ts`: base = `/task-tool/`（本番のみ）
-- `package.json`: homepage = `https://kinoh121.github.io/task-tool`
+users/{uid}
+  lastCopyDate: YYYY-MM-DD    # 引き継ぎ実行済み日付
+  email: string
+```
 
-### UI/機能改善 ✅（7項目）
-1. **グループ名変更** — SideNavの✎ボタンでインライン編集
-2. **リスト名変更** — SideNavの✎ボタンでインライン編集
-3. **モバイルでリスト選択画面** — 未選択時にグループ/リストツリーを表示
-4. **今日ビューの左寄せ** — `margin: '0 auto'` 削除
-5. **「今日」リスト選択肢** — TaskFormのリストセレクターに `TODAY_ID = '__today__'` を追加
-6. **今日タスクのDnD** — restTasksのドラッグ&ドロップ並び替え
-7. **削除ボタン + 確認ダイアログ** — 全タスクに✕ボタン、`confirm()`で確認
+---
 
-### Obsidian出力機能 ✅
-- **今日ビュー**: 「出力」ボタン → `YYYY-MM-DD.md`
-  - 最重要→次点→その他の順
-  - ヘッダー: `# 今日のタスク YYYY-MM-DD`
-  - チェックボックス形式: `- [ ] タスク内容`（優先度なし）
-- **リストビュー**: 「出力」ボタン → `{リスト名}_YYYY-MM-DD.md`
-  - ヘッダー: `# {リスト名} YYYY-MM-DD`
-  - 同形式
+## 実装済み機能
+
+### 今日ビュー
+- 最重要・次点タスクを大きいカードで上部表示
+- その他タスクはコンパクトカード、DnDで並び替え（PC: HTML5 DnD、スマホ: 長押し500ms）
+- 「引き継ぎ」ボタン: 手動引き継ぎ（1日1回制限）
+- 「⚠ 復元」ボタン: アーカイブされたタスクが存在する場合のみ表示
+- Obsidianへのmd出力ボタン
+- タスクカードの🕐ボタン → スケジュールに追加（10分刻み）
+
+### リストビュー
+- グループ → リスト → タスクのツリー構造
+- DnDで並び替え（PC/スマホ対応）
+- Obsidianへのmd出力ボタン
+
+### スケジュールビュー（新機能）
+- 0〜24時の縦型タイムライン（1時間=45px、全体約1080px）
+- タスクから時刻を指定して追加（10分刻み）
+- 優先度別カラーの左ボーダー
+- 個別削除 / 全クリアボタン
+
+### 完了ビュー
+- 完了済みタスク一覧（左揃えレイアウト）
+
+### 過去ビュー
+- dailySnapshotsを参照してその日の今日タスクを表示
+- 前後ナビゲーション（最大90日前）
+- 各タスクに「今日へ」ボタン（間違えた時の救済）
+- デフォルトで昨日を表示
+
+### 引き継ぎフロー
+- AM6以降 + 日付変化 + 今日タスクあり → 自動でコピー選択画面を表示
+- 手動引き継ぎボタン（1日1回制限）
+- コピー選択画面: チェックボックスで選んで今日に追加
+- スキップしても今日のタスクに影響なし
+
+### ナビゲーション
+- **PC**: 左サイドバー（SideNav）
+  - 今日 → リスト（ツリー） → スケジュール → 完了 → 過去
+  - グループ名・リスト名: ダブルクリックで編集 / ✎アイコン削除済み
+- **スマホ**: 下部タブバー（BottomNav）
+  - 今日 → リスト → スケジュール → 完了 → 過去
+
+### タスク操作
+- 優先度変更（PriorityBadgeクリック）
+- タイトルインライン編集（ダブルクリック）
+- 詳細編集（TaskFormモーダル）
+- 今日への追加 / 最重要・次点設定
+- スケジュール追加（🕐ボタン）
+- 複製（TaskForm内コピーボタン → addedToToday引き継ぎ）
+- 削除（確認ダイアログあり）
+
+### モーダル
+- スマホではキーボード表示を考慮して上部寄せ表示
 
 ---
 
@@ -76,33 +142,40 @@
 ```
 C:\Root\task-tool\
 ├── src/
-│   ├── components/
-│   │   ├── layout/SideNav.tsx        # グループ/リスト管理、名前編集
-│   │   └── task/
-│   │       ├── TaskCard.tsx          # タスクカード、削除確認
-│   │       └── TaskForm.tsx          # フォーム（「今日」選択肢付き）
+│   ├── App.tsx                              # ルーティング定義
+│   ├── types/index.ts                       # Task, ScheduleItem など型定義
 │   ├── contexts/
-│   │   ├── AuthContext.tsx           # Google認証
-│   │   └── TaskContext.tsx           # Firestoreデータ管理
+│   │   ├── AppContext.tsx                   # UI状態（コピー画面表示など）
+│   │   ├── AuthContext.tsx                  # Google認証
+│   │   └── TaskContext.tsx                  # Firestoreデータ管理（主要）
+│   ├── hooks/
+│   │   ├── useDailyCheck.ts                 # 日次引き継ぎロジック
+│   │   ├── useTouchSortable.ts              # スマホ長押しDnD
+│   │   └── useAutoDelete.ts                 # 90日以上前のタスク自動削除
+│   ├── components/
+│   │   ├── layout/
+│   │   │   ├── SideNav.tsx                  # PC左ナビ（グループ/リスト管理）
+│   │   │   ├── BottomNav.tsx                # スマホ下部タブ
+│   │   │   └── AppShell.tsx                 # レイアウト外枠
+│   │   ├── task/
+│   │   │   ├── TaskCard.tsx                 # タスクカード（🕐スケジュール追加付き）
+│   │   │   ├── TaskForm.tsx                 # タスク編集モーダル
+│   │   │   └── PriorityBadge.tsx            # 優先度バッジ
+│   │   └── ui/Modal.tsx                     # モーダル（スマホ上部寄せ対応）
 │   ├── views/
-│   │   ├── TodayView/index.tsx       # 今日ビュー（DnD、Obsidian出力）
-│   │   └── ListView/index.tsx        # リストビュー（モバイル対応、Obsidian出力）
-│   └── demo/DemoProviders.tsx        # デモモード
-├── firestore.rules                   # アクセス制限ルール
-├── vite.config.ts                    # base設定、PWA無効
-├── .env.local                        # Firebase設定（gitignore済み）
+│   │   ├── TodayView/index.tsx              # 今日ビュー（PriorityCard含む）
+│   │   ├── ListView/index.tsx               # リストビュー
+│   │   ├── ScheduleView/index.tsx           # スケジュールビュー（新）
+│   │   ├── CompletedView/index.tsx          # 完了ビュー
+│   │   ├── PastView/index.tsx               # 過去ビュー（スナップショット参照）
+│   │   └── CopySelectionView/index.tsx      # 引き継ぎ選択画面
+│   ├── utils/
+│   │   └── dateUtils.ts                     # todayString, yesterdayString, toDateString
+│   └── styles/globals.css                   # CSS変数（カラーテーマ）
+├── firestore.rules                          # アクセス制限ルール
+├── vite.config.ts                           # base=/task-tool/、PWA無効
+├── .env.local                               # Firebase設定（gitignore済み）
 └── package.json
-```
-
-### .env.local の内容
-```
-VITE_DEMO_MODE=false
-VITE_FIREBASE_API_KEY=AIzaSyCOHgDkw4y36EJw41yUDe7kj5W6WwEcRd0
-VITE_FIREBASE_AUTH_DOMAIN=tasktool-f000f.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=tasktool-f000f
-VITE_FIREBASE_STORAGE_BUCKET=tasktool-f000f.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=1034396656526
-VITE_FIREBASE_APP_ID=1:1034396656526:web:36acf24a707027d3ef7adf
 ```
 
 ---
@@ -121,15 +194,19 @@ npm run deploy
 ## 既知の問題・制限
 
 - **PWA無効**: Vite 8 rolldownバグのため。将来Viteが修正されれば再有効化可能
-- **DnD**: HTML5 Drag and Drop API使用。モバイルタッチ非対応
-- **Obsidian出力**: ファイルはダウンロードフォルダへ保存。専用ブラウザのデフォルトダウンロード先をObsidian Vaultに設定して使う
+- **スケジュール**: 日付概念なし（毎日同じスケジュールを使い回す想定）
+- **スナップショット**: 引き継ぎを一度も実行していない日付は過去ビューに記録なし
+- **wasInToday フィールド**: 引き継ぎ機能導入前のタスクには設定されていない（後付けフィールド）
+- **通知**: ブラウザPush通知は未実装。GAS（Gmail）またはGoogleカレンダー通知で代替
 
 ---
 
 ## 次にやること（候補）
 
-特に決定事項なし。ユーザーからの要望待ち。考えられる改善案:
-- モバイルタッチDnD対応
-- タスク完了後のアーカイブ自動化
+現在決定済みのタスクはなし。考えられる改善案:
+
+- スケジュールに持続時間（分単位）を設定できるようにする
+- 過去ビューの「今日へ」ボタンをまとめて選択できるようにする
 - PWA再有効化（Vite修正後）
-- リスト横断でのタスク検索
+- タスク検索機能
+- FCM + Cloud Functions による本格的なPush通知（PWA有効化後）

@@ -15,15 +15,18 @@ export function Modal({ title, onClose, children }: Props) {
     return () => document.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
   return (
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 100,
         background: 'rgba(0,0,0,0.7)',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: '16px',
+        padding: isMobile ? '8px 12px' : '48px 16px',
+        overflowY: 'auto',
       }}
       onClick={onClose}
     >
@@ -35,8 +38,7 @@ export function Modal({ title, onClose, children }: Props) {
           padding: '20px',
           width: '100%',
           maxWidth: 520,
-          maxHeight: '90vh',
-          overflowY: 'auto',
+          flexShrink: 0,
         }}
         onClick={(e) => e.stopPropagation()}
       >

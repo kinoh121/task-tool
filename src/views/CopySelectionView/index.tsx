@@ -1,18 +1,21 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTaskContext, useArchivedYesterday } from '../../contexts/TaskContext';
+import { useTaskContext } from '../../contexts/TaskContext';
 import { useAppState } from '../../contexts/AppContext';
 import { PriorityBadge } from '../../components/task/PriorityBadge';
 import { sortByPriority } from '../../utils/priorityUtils';
 
 export function CopySelectionView() {
-  const { copyTasks } = useTaskContext();
-  const { dispatch } = useAppState();
+  const { state: taskState, copyTasks } = useTaskContext();
+  const { state: appState, dispatch } = useAppState();
   const navigate = useNavigate();
-  const archivedTasks = useArchivedYesterday();
-  const sorted = sortByPriority(archivedTasks);
 
-  const [selected, setSelected] = useState<Set<string>>(new Set(sorted.map((t) => t.id)));
+  // copyTaskIds で指定された ID のタスクを取得（status に関わらず）
+  const tasks = sortByPriority(
+    taskState.tasks.filter((t) => appState.copyTaskIds.includes(t.id))
+  );
+
+  const [selected, setSelected] = useState<Set<string>>(new Set(tasks.map((t) => t.id)));
   const [saving, setSaving] = useState(false);
 
   const toggle = (id: string) => {
@@ -46,40 +49,29 @@ export function CopySelectionView() {
     <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px 16px' }}>
       <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>今日にコピーするタスク</h1>
       <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 20 }}>
-        昨日の未完了タスクです。今日に引き継ぐものを選んでください。
+        昨日の「今日」にあったタスクです。今日に引き継ぐものを選んでください。
       </p>
 
-      {sorted.length === 0 ? (
+      {tasks.length === 0 ? (
         <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0' }}>
           引き継ぎタスクはありません
         </div>
       ) : (
         <>
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => setSelected(new Set(sorted.map((t) => t.id)))}
-            >全選択</button>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => setSelected(new Set())}
-            >全解除</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setSelected(new Set(tasks.map((t) => t.id)))}>全選択</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setSelected(new Set())}>全解除</button>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
-            {sorted.map((task) => (
+            {tasks.map((task) => (
               <label
                 key={task.id}
                 style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 12,
-                  padding: '12px',
+                  display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px',
                   background: 'var(--bg-secondary)',
                   border: `1px solid ${selected.has(task.id) ? 'var(--accent)' : 'var(--border)'}`,
-                  borderRadius: 'var(--radius)',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.15s',
+                  borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'border-color 0.15s',
                 }}
               >
                 <input
@@ -110,11 +102,7 @@ export function CopySelectionView() {
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <button className="btn btn-ghost" onClick={handleSkip}>スキップ</button>
-        <button
-          className="btn btn-primary"
-          onClick={handleConfirm}
-          disabled={saving}
-        >
+        <button className="btn btn-primary" onClick={handleConfirm} disabled={saving}>
           {saving ? '処理中...' : `${selected.size}件をコピー`}
         </button>
       </div>

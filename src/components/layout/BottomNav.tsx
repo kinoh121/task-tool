@@ -3,10 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 const TABS = [
   { path: '/', label: '今日', icon: '○' },
   { path: '/lists', label: 'リスト', icon: '≡' },
+  { path: '/schedule', label: 'スケジュール', icon: '◔' },
   { path: '/completed', label: '完了', icon: '✓' },
   { path: '/past', label: '過去', icon: '◷' },
-  { path: '/archive', label: 'アーカイブ', icon: '□' },
 ];
+
+const HABIT_URL = 'https://kinoh121.github.io/habit-tracker/';
 
 export function BottomNav() {
   const navigate = useNavigate();
@@ -46,6 +48,26 @@ export function BottomNav() {
           </button>
         );
       })}
+      <a
+        href={HABIT_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 2,
+          fontSize: 11,
+          color: 'var(--text-muted)',
+          textDecoration: 'none',
+          minHeight: 'var(--nav-height)',
+        }}
+      >
+        <span style={{ fontSize: 20, lineHeight: 1 }}>★</span>
+        <span>Habit</span>
+      </a>
     </nav>
   );
 }

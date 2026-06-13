@@ -68,7 +68,7 @@ export function DemoTaskProvider({ children }: { children: React.ReactNode }) {
     deleteList: async (id) => setLists(l => l.filter(x => x.id !== id)),
     addTask: async (data) => {
       const id = uid();
-      setTasks(t => [{ id, content: data.content || '', detail: data.detail || '', priority: data.priority || 'C', dueDate: data.dueDate ?? null, listId: data.listId || '', status: 'active', isTopPriority: false, isSecondPriority: false, completedAt: null, archivedAt: null, createdAt: new Date(), copiedFromId: null }, ...t]);
+      setTasks(t => { const maxOrder = t.filter(x => x.listId === data.listId).reduce((m, x) => Math.max(m, x.order ?? 0), 0); return [{ id, content: data.content || '', detail: data.detail || '', priority: data.priority || 'C', dueDate: data.dueDate ?? null, listId: data.listId || '', status: 'active', order: maxOrder + 1, todayDate: data.todayDate ?? null, isTopPriority: false, isSecondPriority: false, completedAt: null, archivedAt: null, createdAt: new Date(), copiedFromId: null }, ...t]; });
       return id;
     },
     updateTask: async (id, data) => setTasks(t => t.map(x => x.id === id ? { ...x, ...data } : x)),

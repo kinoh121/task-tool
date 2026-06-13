@@ -18,7 +18,7 @@ function RealAuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Dynamic import avoids crashing when Firebase config is missing
-    import('../firebase').then(({ auth, googleProvider }) => {
+    import('../firebase').then(({ auth }) => {
       const unsubscribe = onAuthStateChanged(auth, (u) => {
         setUser(u);
         setLoading(false);

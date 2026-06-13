@@ -1,8 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTaskContext } from '../../contexts/TaskContext';
 import { useAppState } from '../../contexts/AppContext';
+
+const LONG_PRESS_MS = 500;
+
+/** 長押し用ハンドラを返す（通常関数 — フックではないのでmap内でも使用可）*/
+function makeLongPress(onLongPress: () => void) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const start = () => { timer = setTimeout(() => { onLongPress(); timer = null; }, LONG_PRESS_MS); };
+  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  return {
+    onTouchStart: (e: React.TouchEvent) => { e.stopPropagation(); start(); },
+    onTouchEnd: cancel,
+    onTouchMove: cancel,
+    onTouchCancel: cancel,
+  };
+}
 
 export function SideNav() {
   const navigate = useNavigate();
@@ -10,6 +25,17 @@ export function SideNav() {
   const { handleSignOut } = useAuth();
   const { state: taskState, addGroup, updateGroup, addList, updateList, deleteGroup, deleteList } = useTaskContext();
   const { state: appState, dispatch } = useAppState();
+
+  const initialOpenDone = useRef(false);
+  useEffect(() => {
+    if (initialOpenDone.current || taskState.groups.length === 0) return;
+    initialOpenDone.current = true;
+    for (const group of taskState.groups) {
+      if (!(appState.openGroupIds ?? []).includes(group.id)) {
+        dispatch({ type: 'TOGGLE_GROUP', groupId: group.id });
+      }
+    }
+  }, [taskState.groups]);
 
   const [addingGroup, setAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
@@ -71,6 +97,7 @@ export function SideNav() {
         borderLeft: `3px solid ${isActive(path) ? 'var(--accent)' : 'transparent'}`,
         transition: 'all 0.15s',
         minHeight: 40,
+        userSelect: 'none',
       }}
     >
       {label}
@@ -86,6 +113,7 @@ export function SideNav() {
       flexDirection: 'column',
       overflowY: 'auto',
       flexShrink: 0,
+      userSelect: 'none',
     }}>
       <div style={{ padding: '16px 20px 12px', fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
         TaskTool
@@ -108,6 +136,7 @@ export function SideNav() {
               borderLeft: `3px solid ${isActive('/lists') ? 'var(--accent)' : 'transparent'}`,
               transition: 'all 0.15s',
               minHeight: 40,
+              userSelect: 'none',
             }}
           >
             リスト
@@ -140,6 +169,9 @@ export function SideNav() {
           const groupLists = taskState.lists.filter((l) => l.groupId === group.id);
           const isOpen = (appState.openGroupIds ?? []).includes(group.id);
 
+          const startGroupEdit = () => { setEditingGroupId(group.id); setEditGroupName(group.name); };
+          const groupLongPress = makeLongPress(startGroupEdit);
+
           return (
             <div key={group.id}>
               <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -159,6 +191,9 @@ export function SideNav() {
                 ) : (
                   <button
                     onClick={() => dispatch({ type: 'TOGGLE_GROUP', groupId: group.id })}
+                    onDoubleClick={startGroupEdit}
+                    {...groupLongPress}
+                    title="ダブルクリック（長押し）でグループ名を変更"
                     style={{
                       flex: 1,
                       display: 'flex',
@@ -174,17 +209,11 @@ export function SideNav() {
                     }}
                   >
                     <span style={{ fontSize: 9 }}>{isOpen ? '▼' : '▶'}</span>
-                    <span style={{ flex: 1 }}>{group.name}</span>
+                    <span style={{ flex: 1, userSelect: 'text' }}>{group.name}</span>
                   </button>
                 )}
                 {editingGroupId !== group.id && (
                   <>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => { setEditingGroupId(group.id); setEditGroupName(group.name); }}
-                      title="グループ名を変更"
-                      style={{ fontSize: 11, padding: '2px 4px', minHeight: 28, color: 'var(--text-muted)' }}
-                    >✎</button>
                     <button
                       className="btn btn-ghost btn-sm"
                       onClick={() => setAddingListForGroup(group.id)}
@@ -221,6 +250,9 @@ export function SideNav() {
 
               {isOpen && groupLists.map((list) => {
                 const listActive = appState.selectedListId === list.id && isActive('/lists');
+                const startListEdit = () => { setEditingListId(list.id); setEditListName(list.name); };
+                const listLongPress = makeLongPress(startListEdit);
+
                 return (
                   <div key={list.id} style={{ display: 'flex', alignItems: 'center' }}>
                     {editingListId === list.id ? (
@@ -242,6 +274,9 @@ export function SideNav() {
                           dispatch({ type: 'SELECT_LIST', listId: list.id });
                           navigate('/lists');
                         }}
+                        onDoubleClick={startListEdit}
+                        {...listLongPress}
+                        title="ダブルクリック（長押し）でリスト名を変更"
                         style={{
                           flex: 1,
                           display: 'block',
@@ -255,26 +290,18 @@ export function SideNav() {
                           transition: 'all 0.15s',
                         }}
                       >
-                        {list.name}
+                        <span style={{ userSelect: 'text' }}>{list.name}</span>
                       </button>
                     )}
                     {editingListId !== list.id && (
-                      <>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => { setEditingListId(list.id); setEditListName(list.name); }}
-                          title="リスト名を変更"
-                          style={{ fontSize: 11, padding: '2px 4px', minHeight: 28, color: 'var(--text-muted)' }}
-                        >✎</button>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => {
-                            if (confirm(`リスト「${list.name}」を削除しますか？`)) deleteList(list.id);
-                          }}
-                          title="リスト削除"
-                          style={{ fontSize: 12, padding: '2px 6px', minHeight: 28, color: 'var(--text-muted)', marginRight: 4 }}
-                        >✕</button>
-                      </>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => {
+                          if (confirm(`リスト「${list.name}」を削除しますか？`)) deleteList(list.id);
+                        }}
+                        title="リスト削除"
+                        style={{ fontSize: 12, padding: '2px 6px', minHeight: 28, color: 'var(--text-muted)', marginRight: 4 }}
+                      >✕</button>
                     )}
                   </div>
                 );
@@ -284,9 +311,27 @@ export function SideNav() {
         })}
       </div>
 
+      {navItem('/schedule', 'スケジュール')}
       {navItem('/completed', '完了')}
       {navItem('/past', '過去')}
-      {navItem('/archive', 'アーカイブ')}
+      <a
+        href="https://kinoh121.github.io/habit-tracker/"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: 'block',
+          padding: '9px 20px',
+          textAlign: 'left',
+          fontSize: 14,
+          color: 'var(--text-secondary)',
+          borderLeft: '3px solid transparent',
+          textDecoration: 'none',
+          minHeight: 40,
+          userSelect: 'none',
+        }}
+      >
+        Habit
+      </a>
 
       <div style={{ flex: 1 }} />
 

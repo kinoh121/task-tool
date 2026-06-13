@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { Task, Priority, List } from '../../types';
+import { PRIORITY_LABELS, PRIORITY_COLORS } from '../../utils/priorityUtils';
+import { todayString } from '../../utils/dateUtils';
 import { useTaskContext } from '../../contexts/TaskContext';
 
 interface Props {
@@ -10,17 +12,17 @@ interface Props {
   onClose: () => void;
 }
 
-const PRIORITIES: Priority[] = ['S', 'A', 'B', 'C', 'D'];
+const PRIORITIES: Priority[] = ['S', 'A', 'B', 'C', 'D', 'none'];
 const TODAY_ID = '__today__';
 
 export function TaskForm({ lists, defaultListId, defaultAddToToday, task, onClose }: Props) {
   const { addTask, updateTask, duplicateTask } = useTaskContext();
   const [content, setContent] = useState(task?.content || '');
   const [detail, setDetail] = useState(task?.detail || '');
-  const [priority, setPriority] = useState<Priority>(task?.priority || 'C');
+  const [priority, setPriority] = useState<Priority>(task?.priority || 'none');
   const [dueDate, setDueDate] = useState(task?.dueDate || '');
   const [listId, setListId] = useState<string>(() => {
-    if (task?.addedToToday || defaultAddToToday) return TODAY_ID;
+    if (task?.todayDate === todayString() || defaultAddToToday) return TODAY_ID;
     return task?.listId || defaultListId || (lists[0]?.id ?? '');
   });
   const [saving, setSaving] = useState(false);
@@ -34,13 +36,13 @@ export function TaskForm({ lists, defaultListId, defaultAddToToday, task, onClos
     e.preventDefault();
     if (!content.trim()) return;
     setSaving(true);
-    const addedToToday = listId === TODAY_ID;
+    const newTodayDate = listId === TODAY_ID ? todayString() : null;
     const resolvedListId = resolveListId();
     try {
       if (task) {
-        await updateTask(task.id, { content, detail, priority, dueDate: dueDate || null, listId: resolvedListId, addedToToday });
+        await updateTask(task.id, { content, detail, priority, dueDate: dueDate || null, listId: resolvedListId, todayDate: newTodayDate });
       } else {
-        await addTask({ content, detail, priority, dueDate: dueDate || null, listId: resolvedListId, addedToToday });
+        await addTask({ content, detail, priority, dueDate: dueDate || null, listId: resolvedListId, todayDate: newTodayDate });
       }
       onClose();
     } finally {
@@ -73,13 +75,15 @@ export function TaskForm({ lists, defaultListId, defaultAddToToday, task, onClos
           rows={3}
         />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div>
-          <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-            優先度
-          </label>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {PRIORITIES.map((p) => (
+      <div>
+        <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+          優先度
+        </label>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {PRIORITIES.map((p) => {
+            const lbl = PRIORITY_LABELS[p] || '−';
+            const color = PRIORITY_COLORS[p];
+            return (
               <button
                 key={p}
                 type="button"
@@ -88,29 +92,29 @@ export function TaskForm({ lists, defaultListId, defaultAddToToday, task, onClos
                   flex: 1,
                   padding: '6px 4px',
                   borderRadius: 4,
-                  border: priority === p ? '2px solid var(--accent)' : '2px solid var(--border)',
-                  background: priority === p ? 'var(--accent)22' : 'var(--bg-tertiary)',
-                  color: priority === p ? 'var(--accent)' : 'var(--text-secondary)',
+                  border: priority === p ? `2px solid ${color}` : '2px solid var(--border)',
+                  background: priority === p ? color + '22' : 'var(--bg-tertiary)',
+                  color: priority === p ? color : 'var(--text-secondary)',
                   fontWeight: 700,
                   fontSize: 13,
                   minHeight: 36,
                 }}
               >
-                {p}
+                {lbl}
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
-        <div>
-          <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
-            期日（任意）
-          </label>
-          <input
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
-        </div>
+      </div>
+      <div>
+        <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
+          期日（任意）
+        </label>
+        <input
+          type="date"
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
+        />
       </div>
       <div>
         <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>

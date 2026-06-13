@@ -1,6 +1,6 @@
 import type { Task, Priority } from '../types';
 
-const PRIORITY_ORDER: Priority[] = ['S', 'A', 'B', 'C', 'D'];
+const PRIORITY_ORDER: Priority[] = ['S', 'A', 'B', 'C', 'D', 'none'];
 
 export function priorityRank(p: Priority): number {
   return PRIORITY_ORDER.indexOf(p);
@@ -24,7 +24,7 @@ export function getSecondPriorityTask(tasks: Task[], topId: string | null): Task
 }
 
 export const PRIORITY_LABELS: Record<Priority, string> = {
-  S: 'S', A: 'A', B: 'B', C: 'C', D: 'D',
+  S: 'S', A: 'A', B: 'B', C: 'C', D: 'D', none: '',
 };
 
 export const PRIORITY_COLORS: Record<Priority, string> = {
@@ -32,5 +32,6 @@ export const PRIORITY_COLORS: Record<Priority, string> = {
   A: '#ff6b35',
   B: '#ffd32a',
   C: '#7bed9f',
-  D: '#a4b0be',
+  D: '#74b9ff',
+  none: '#6b7280',
 };

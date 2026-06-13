@@ -12,7 +12,7 @@ export function CompletedView() {
   const dates = [...grouped.keys()].sort().reverse();
 
   return (
-    <div style={{ maxWidth: 680, margin: '0 auto', padding: '20px 16px' }}>
+    <div style={{ maxWidth: 720, padding: '20px 24px' }}>
       <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>完了タスク</h1>
 
       {completed.length === 0 ? (

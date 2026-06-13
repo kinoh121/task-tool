@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { Priority } from '../../types';
-import { PRIORITY_COLORS } from '../../utils/priorityUtils';
+import { PRIORITY_COLORS, PRIORITY_LABELS } from '../../utils/priorityUtils';
 
-const PRIORITIES: Priority[] = ['S', 'A', 'B', 'C', 'D'];
+const PRIORITIES: Priority[] = ['S', 'A', 'B', 'C', 'D', 'none'];
 
 interface Props {
   priority: Priority;
@@ -12,7 +13,9 @@ interface Props {
 
 export function PriorityBadge({ priority, size = 'md', onChange }: Props) {
   const [open, setOpen] = useState(false);
+  const [dropPos, setDropPos] = useState<{ top?: number; bottom?: number; left: number }>({ top: 0, left: 0 });
   const ref = useRef<HTMLSpanElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
   const color = PRIORITY_COLORS[priority];
   const fontSize = size === 'sm' ? '11px' : '12px';
   const padding = size === 'sm' ? '1px 6px' : '2px 8px';
@@ -20,7 +23,11 @@ export function PriorityBadge({ priority, size = 'md', onChange }: Props) {
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        ref.current && !ref.current.contains(target) &&
+        dropRef.current && !dropRef.current.contains(target)
+      ) {
         setOpen(false);
       }
     };
@@ -28,6 +35,7 @@ export function PriorityBadge({ priority, size = 'md', onChange }: Props) {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  const label = PRIORITY_LABELS[priority];
   const badge = (
     <span style={{
       display: 'inline-block',
@@ -42,8 +50,10 @@ export function PriorityBadge({ priority, size = 'md', onChange }: Props) {
       fontFamily: 'monospace',
       cursor: onChange ? 'pointer' : 'default',
       userSelect: 'none',
+      minWidth: size === 'sm' ? '22px' : '26px',
+      textAlign: 'center',
     }}>
-      {priority}
+      {label}
     </span>
   );
 
@@ -52,22 +62,30 @@ export function PriorityBadge({ priority, size = 'md', onChange }: Props) {
   return (
     <span ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <span
-        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!open && ref.current) {
+            const rect = ref.current.getBoundingClientRect();
+            const dropdownHeight = PRIORITIES.length * 36 + 8;
+            const goUp = rect.bottom + dropdownHeight > window.innerHeight - 8;
+            setDropPos(goUp
+              ? { bottom: window.innerHeight - rect.top + 4, left: rect.left }
+              : { top: rect.bottom + 4, left: rect.left }
+            );
+          }
+          setOpen((v) => !v);
+        }}
         title="優先度を変更"
       >
         {badge}
       </span>
-      {open && (
-        <>
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 199 }}
-            onClick={(e) => { e.stopPropagation(); setOpen(false); }}
-          />
-          <div style={{
-            position: 'absolute',
-            top: '110%',
-            left: 0,
-            zIndex: 200,
+      {open && createPortal(
+        <div ref={dropRef} style={{
+            position: 'fixed',
+            top: dropPos.top,
+            bottom: dropPos.bottom,
+            left: dropPos.left,
+            zIndex: 10000,
             background: 'var(--bg-secondary)',
             border: '1px solid var(--border)',
             borderRadius: 6,
@@ -80,6 +98,7 @@ export function PriorityBadge({ priority, size = 'md', onChange }: Props) {
           }}>
             {PRIORITIES.map((p) => {
               const c = PRIORITY_COLORS[p];
+              const lbl = PRIORITY_LABELS[p] || '−';
               return (
                 <button
                   key={p}
@@ -95,14 +114,15 @@ export function PriorityBadge({ priority, size = 'md', onChange }: Props) {
                     fontFamily: 'monospace',
                     cursor: 'pointer',
                     textAlign: 'center',
+                    minWidth: 36,
                   }}
                 >
-                  {p}
+                  {lbl}
                 </button>
               );
             })}
-          </div>
-        </>
+        </div>,
+        document.body
       )}
     </span>
   );

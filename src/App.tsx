@@ -9,8 +9,8 @@ import { TodayView } from './views/TodayView';
 import { CopySelectionView } from './views/CopySelectionView';
 import { ListView } from './views/ListView';
 import { CompletedView } from './views/CompletedView';
-import { ArchiveView } from './views/ArchiveView';
 import { PastView } from './views/PastView';
+import { ScheduleView } from './views/ScheduleView';
 import { useDailyCheck } from './hooks/useDailyCheck';
 import { useAutoDelete } from './hooks/useAutoDelete';
 
@@ -47,8 +47,8 @@ function AppRoutes() {
         <Route path="/" element={<TodayView />} />
         <Route path="/copy" element={<CopySelectionView />} />
         <Route path="/lists" element={<ListView />} />
+        <Route path="/schedule" element={<ScheduleView />} />
         <Route path="/completed" element={<CompletedView />} />
-        <Route path="/archive" element={<ArchiveView />} />
         <Route path="/past" element={<PastView />} />
       </Routes>
     </AppShell>

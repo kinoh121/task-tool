@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Priority, Task } from '../../types';
+import { todayString } from '../../utils/dateUtils';
 import { useTaskContext } from '../../contexts/TaskContext';
+import { useAppState } from '../../contexts/AppContext';
+import { useDailyCheck } from '../../hooks/useDailyCheck';
 import { TaskCard } from '../../components/task/TaskCard';
 import { TaskForm } from '../../components/task/TaskForm';
 import { Modal } from '../../components/ui/Modal';
@@ -39,7 +42,23 @@ function reorderArray(arr: Task[], fromId: string, toId: string): Task[] {
 }
 
 export function TodayView() {
-  const { state, deleteTask, completeTask, setTopPriority, setSecondPriority, updateTask, addTask, reorderTasks } = useTaskContext();
+  const { state, deleteTask, completeTask, setTopPriority, setSecondPriority, updateTask, addTask, reorderTasks, restoreTask } = useTaskContext();
+  const { } = useAppState();
+  const { triggerCopyFlow } = useDailyCheck();
+  const [restoring, setRestoring] = useState(false);
+
+  // アーカイブされた全タスクを active に戻す（データ復旧用）
+  const handleRestoreAll = async () => {
+    const archived = state.tasks.filter((t) => t.status === 'archived');
+    if (archived.length === 0) { alert('アーカイブされたタスクはありません'); return; }
+    if (!confirm(`アーカイブされた ${archived.length} 件のタスクを全て復元しますか？`)) return;
+    setRestoring(true);
+    try {
+      for (const t of archived) await restoreTask(t.id);
+    } finally {
+      setRestoring(false);
+    }
+  };
   const [showForm, setShowForm] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [showBulkAdd, setShowBulkAdd] = useState(false);
@@ -50,7 +69,7 @@ export function TodayView() {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
-  const todayTasks = state.tasks.filter((t) => t.status === 'active' && t.addedToToday);
+  const todayTasks = state.tasks.filter((t) => t.status === 'active' && t.todayDate === todayString());
   const top = getTopPriorityTask(todayTasks);
   const second = getSecondPriorityTask(todayTasks, top?.id || null);
   const restTasks = todayTasks
@@ -113,7 +132,7 @@ export function TodayView() {
     try {
       const listId = state.lists[0]?.id ?? '';
       for (const content of lines) {
-        await addTask({ content, detail: '', priority: 'A', dueDate: null, listId, addedToToday: true });
+        await addTask({ content, detail: '', priority: 'A', dueDate: null, listId, todayDate: todayString() });
       }
       setBulkText('');
       setShowBulkAdd(false);
@@ -136,7 +155,25 @@ export function TodayView() {
           <button className="btn btn-ghost btn-sm" onClick={() => setShowBulkAdd(true)}>
             複数追加
           </button>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => triggerCopyFlow()}
+            title="昨日の「今日」にあったタスクを今日に引き継ぐ（1日1回）"
+          >
+            引き継ぎ
+          </button>
+          {state.tasks.some((t) => t.status === 'archived') && (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={handleRestoreAll}
+              disabled={restoring}
+              title="アーカイブされたタスクを全て復元"
+              style={{ color: 'var(--warning, #f59e0b)', fontSize: 12 }}
+            >
+              {restoring ? '復元中...' : '⚠ 復元'}
+            </button>
+          )}
+<button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
             + タスク追加
           </button>
         </div>
@@ -284,13 +321,26 @@ interface PriorityCardProps {
   onChangePriority: (p: Priority) => void;
 }
 
+const SCHEDULE_HOURS = Array.from({ length: 24 }, (_, i) => i);
+const SCHEDULE_MINUTES = [0, 10, 20, 30, 40, 50];
+
 function PriorityCard({ task, rank, onEdit, onComplete, onDelete, onSetTop, onSetSecond, onChangePriority }: PriorityCardProps) {
-  const { updateTask } = useTaskContext();
-  const [expanded, setExpanded] = useState(false);
+  const { updateTask, addScheduleItem } = useTaskContext();
+  const [expanded, setExpanded] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
+  const [scheduleHour, setScheduleHour] = useState(9);
+  const [scheduleMinute, setScheduleMinute] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const isTop = rank === 'top';
+
+  const handleAddSchedule = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const time = `${String(scheduleHour).padStart(2, '0')}:${String(scheduleMinute).padStart(2, '0')}`;
+    await addScheduleItem({ label: task.content, time, priority: task.priority, taskId: task.id });
+    setShowSchedulePicker(false);
+  };
 
   useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
 
@@ -383,12 +433,45 @@ function PriorityCard({ task, rank, onEdit, onComplete, onDelete, onSetTop, onSe
           >☆</button>
           <button
             className="btn btn-ghost btn-sm"
+            onClick={(e) => { e.stopPropagation(); setShowSchedulePicker(!showSchedulePicker); }}
+            title="スケジュールに追加"
+            style={{ fontSize: 13, padding: '4px 6px', minHeight: 36, color: showSchedulePicker ? 'var(--accent)' : 'var(--text-muted)' }}
+          >🕐</button>
+          <button
+            className="btn btn-ghost btn-sm"
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             title="削除"
             style={{ fontSize: 13, padding: '4px 6px', minHeight: 36, color: 'var(--text-muted)' }}
           >✕</button>
         </div>
       </div>
+      {showSchedulePicker && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            marginTop: 8,
+            padding: '8px 10px',
+            background: 'var(--bg-tertiary)',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>時刻</span>
+          <select value={scheduleHour} onChange={(e) => setScheduleHour(Number(e.target.value))} style={{ width: 64, fontSize: 13, padding: '3px 4px' }}>
+            {SCHEDULE_HOURS.map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}</option>)}
+          </select>
+          <span style={{ color: 'var(--text-muted)' }}>:</span>
+          <select value={scheduleMinute} onChange={(e) => setScheduleMinute(Number(e.target.value))} style={{ width: 64, fontSize: 13, padding: '3px 4px' }}>
+            {SCHEDULE_MINUTES.map((m) => <option key={m} value={m}>{String(m).padStart(2, '0')}</option>)}
+          </select>
+          <button className="btn btn-primary btn-sm" onClick={handleAddSchedule} style={{ fontSize: 12, padding: '4px 10px', minHeight: 28 }}>追加</button>
+          <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setShowSchedulePicker(false); }} style={{ fontSize: 12, padding: '4px 8px', minHeight: 28 }}>✕</button>
+        </div>
+      )}
     </div>
   );
 }

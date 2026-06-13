@@ -44,7 +44,7 @@ export function ListView() {
   const selectedList = state.lists.find((l) => l.id === appState.selectedListId);
   const listTasks = appState.selectedListId
     ? state.tasks
-        .filter((t) => t.listId === appState.selectedListId && t.status === 'active' && !t.addedToToday)
+        .filter((t) => t.listId === appState.selectedListId && t.status === 'active' && t.todayDate === null)
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     : [];
 
@@ -91,7 +91,7 @@ export function ListView() {
     setBulkSaving(true);
     try {
       for (const content of lines) {
-        await addTask({ content, detail: '', priority: 'A', dueDate: null, listId: appState.selectedListId, addedToToday: false });
+        await addTask({ content, detail: '', priority: 'A', dueDate: null, listId: appState.selectedListId, todayDate: null });
       }
       setBulkText('');
       setShowBulkAdd(false);

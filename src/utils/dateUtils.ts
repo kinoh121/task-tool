@@ -9,6 +9,12 @@ export function todayString(): string {
   return toDateString(new Date());
 }
 
+export function yesterdayString(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return toDateString(d);
+}
+
 export function formatDisplayDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('-');
   return `${y}/${m}/${d}`;

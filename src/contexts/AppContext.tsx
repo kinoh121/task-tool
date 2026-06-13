@@ -2,20 +2,22 @@ import React, { createContext, useContext, useReducer } from 'react';
 
 interface AppState {
   selectedListId: string | null;
-  openGroupIds: string[];          // 複数グループを同時に開ける
+  openGroupIds: string[];
   showCopyScreen: boolean;
+  copyTaskIds: string[];   // 引き継ぎ候補のタスクID（タイミング競合を避けるため明示的に渡す）
 }
 
 type AppAction =
   | { type: 'SELECT_LIST'; listId: string | null }
   | { type: 'TOGGLE_GROUP'; groupId: string }
-  | { type: 'SHOW_COPY_SCREEN' }
+  | { type: 'SHOW_COPY_SCREEN'; taskIds: string[] }
   | { type: 'HIDE_COPY_SCREEN' };
 
 const initialState: AppState = {
   selectedListId: null,
   openGroupIds: [],
   showCopyScreen: false,
+  copyTaskIds: [],
 };
 
 function reducer(state: AppState, action: AppAction): AppState {
@@ -33,9 +35,9 @@ function reducer(state: AppState, action: AppAction): AppState {
       };
     }
     case 'SHOW_COPY_SCREEN':
-      return { ...state, showCopyScreen: true };
+      return { ...state, showCopyScreen: true, copyTaskIds: action.taskIds };
     case 'HIDE_COPY_SCREEN':
-      return { ...state, showCopyScreen: false };
+      return { ...state, showCopyScreen: false, copyTaskIds: [] };
     default:
       return state;
   }
