@@ -314,24 +314,6 @@ export function SideNav() {
       {navItem('/schedule', 'スケジュール')}
       {navItem('/completed', '完了')}
       {navItem('/past', '過去')}
-      <a
-        href="https://kinoh121.github.io/habit-tracker/"
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: 'block',
-          padding: '9px 20px',
-          textAlign: 'left',
-          fontSize: 14,
-          color: 'var(--text-secondary)',
-          borderLeft: '3px solid transparent',
-          textDecoration: 'none',
-          minHeight: 40,
-          userSelect: 'none',
-        }}
-      >
-        Habit
-      </a>
 
       <div style={{ flex: 1 }} />
 

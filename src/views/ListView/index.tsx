@@ -151,6 +151,7 @@ export function ListView() {
             position: 'fixed',
             bottom: 'calc(var(--nav-height) + var(--safe-bottom) + 12px)',
             left: 16,
+            right: 16,
             zIndex: 100,
             background: 'var(--bg-tertiary)',
             border: '1px solid var(--border)',
