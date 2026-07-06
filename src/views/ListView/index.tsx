@@ -343,13 +343,21 @@ export function ListView() {
                           </div>
                         </form>
                       ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--radius)',
+                            overflow: 'hidden',
+                          }}
+                        >
                           <button
                             onClick={() => dispatch({ type: 'SELECT_LIST', listId: list.id })}
                             style={{
                               flex: 1, minWidth: 0, textAlign: 'left', padding: '12px 16px',
-                              background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                              borderRadius: 'var(--radius)', fontSize: 14, color: 'var(--text-primary)',
+                              background: 'transparent', fontSize: 14, color: 'var(--text-primary)',
                               cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                             }}
                           >
@@ -359,7 +367,7 @@ export function ListView() {
                             className="btn btn-ghost btn-sm"
                             onClick={() => startEditList(list.id, list.name)}
                             title="リスト名を変更"
-                            style={{ ...mobileIconButtonStyle, fontSize: 14 }}
+                            style={{ ...mobileIconButtonStyle, fontSize: 14, flexShrink: 0 }}
                           >
                             ✎
                           </button>
@@ -369,7 +377,7 @@ export function ListView() {
                               if (confirm(`リスト「${list.name}」を削除しますか？`)) deleteList(list.id);
                             }}
                             title="リスト削除"
-                            style={{ ...mobileIconButtonStyle, color: 'var(--danger)' }}
+                            style={{ ...mobileIconButtonStyle, color: 'var(--danger)', flexShrink: 0 }}
                           >
                             ✕
                           </button>
