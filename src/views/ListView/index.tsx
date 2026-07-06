@@ -28,12 +28,14 @@ function reorderArray(arr: Task[], fromId: string, toId: string): Task[] {
 }
 
 export function ListView() {
-  const { state, reorderTasks, addTask } = useTaskContext();
+  const { state, reorderTasks, addTask, addGroup } = useTaskContext();
   const { state: appState, dispatch } = useAppState();
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showBulkAdd, setShowBulkAdd] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [addingGroup, setAddingGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
 
   const dragId = useRef<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -100,35 +102,85 @@ export function ListView() {
     }
   };
 
+  const handleAddGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = newGroupName.trim();
+    if (!name) return;
+    await addGroup(name);
+    setNewGroupName('');
+    setAddingGroup(false);
+  };
+
   if (!selectedList) {
     if (!isMobile) return <div style={{ flex: 1 }} />;
     return (
       <div style={{ padding: '20px 24px' }}>
-        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20 }}>リストを選択</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600 }}>リストを選択</h2>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => setAddingGroup(true)}
+            style={{ minHeight: 36, whiteSpace: 'nowrap' }}
+          >
+            + グループ
+          </button>
+        </div>
+
+        {addingGroup && (
+          <form onSubmit={handleAddGroup} style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                placeholder="グループ名"
+                autoFocus
+              />
+              <button type="submit" className="btn btn-primary btn-sm" disabled={!newGroupName.trim()}>
+                追加
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setNewGroupName('');
+                  setAddingGroup(false);
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          </form>
+        )}
+
         {state.groups.map((group) => {
           const groupLists = state.lists.filter((l) => l.groupId === group.id);
-          if (groupLists.length === 0) return null;
           return (
             <div key={group.id} style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 {group.name}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {groupLists.map((list) => (
-                  <button
-                    key={list.id}
-                    onClick={() => dispatch({ type: 'SELECT_LIST', listId: list.id })}
-                    style={{
-                      width: '100%', textAlign: 'left', padding: '12px 16px',
-                      background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius)', fontSize: 14, color: 'var(--text-primary)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {list.name}
-                  </button>
-                ))}
-              </div>
+              {groupLists.length === 0 ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '10px 12px', border: '1px dashed var(--border)', borderRadius: 'var(--radius)' }}>
+                  リストがありません
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {groupLists.map((list) => (
+                    <button
+                      key={list.id}
+                      onClick={() => dispatch({ type: 'SELECT_LIST', listId: list.id })}
+                      style={{
+                        width: '100%', textAlign: 'left', padding: '12px 16px',
+                        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius)', fontSize: 14, color: 'var(--text-primary)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {list.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
