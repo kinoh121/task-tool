@@ -40,8 +40,18 @@ export default defineConfig({
         ],
       },
       workbox: {
-        navigateFallback: '/task-tool/index.html',
+        navigateFallback: null,
         globPatterns: ['**/*.{js,css,html,svg,png}'],
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'task-tool-pages',
+              networkTimeoutSeconds: 3,
+            },
+          },
+        ],
       },
     }),
   ],
