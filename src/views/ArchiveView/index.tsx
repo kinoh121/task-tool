@@ -44,7 +44,7 @@ export function ArchiveView() {
               }}>
                 {date.replace(/-/g, '/')}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {tasks.map((task) => (
                   <div
                     key={task.id}

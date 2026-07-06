@@ -92,12 +92,12 @@ export function TodayView() {
   const handleDragEnd = () => { dragId.current = null; setDragOverId(null); };
 
   const getDragBorder = (taskId: string) => {
-    if (dragOverId !== taskId || !dragId.current || dragId.current === taskId) return { borderTop: '2px solid transparent', borderBottom: '2px solid transparent' };
+    if (dragOverId !== taskId || !dragId.current || dragId.current === taskId) return { borderTop: '1px solid transparent', borderBottom: '1px solid transparent' };
     const fromIdx = restTasks.findIndex(t => t.id === dragId.current);
     const toIdx = restTasks.findIndex(t => t.id === taskId);
     return fromIdx < toIdx
-      ? { borderTop: '2px solid transparent', borderBottom: '2px solid var(--accent)' }
-      : { borderTop: '2px solid var(--accent)', borderBottom: '2px solid transparent' };
+      ? { borderTop: '1px solid transparent', borderBottom: '1px solid var(--accent)' }
+      : { borderTop: '1px solid var(--accent)', borderBottom: '1px solid transparent' };
   };
 
   const { containerRef: touchContainerRef, handleTouchStart, getTouchDragBorder, draggingId } = useTouchSortable(
@@ -217,7 +217,7 @@ export function TodayView() {
           )}
 
           {restTasks.length > 0 && (
-            <div ref={touchContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div ref={touchContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {restTasks.map((t) => (
                 <div
                   key={t.id}

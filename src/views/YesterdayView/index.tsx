@@ -54,7 +54,7 @@ export function YesterdayView() {
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 8 }}>
                 完了したタスク
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {completedYesterday.map((t) => (
                   <TaskCard key={t.id} task={t} />
                 ))}
@@ -67,7 +67,7 @@ export function YesterdayView() {
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: 8 }}>
                 持ち越したタスク
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {archivedYesterday.map((t) => (
                   <TaskCard key={t.id} task={t} />
                 ))}

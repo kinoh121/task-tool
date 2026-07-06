@@ -79,12 +79,12 @@ export function ListView() {
   const handleDragEnd = () => { dragId.current = null; setDragOverId(null); };
 
   const getDragBorder = (taskId: string) => {
-    if (dragOverId !== taskId || !dragId.current || dragId.current === taskId) return { borderTop: '2px solid transparent', borderBottom: '2px solid transparent' };
+    if (dragOverId !== taskId || !dragId.current || dragId.current === taskId) return { borderTop: '1px solid transparent', borderBottom: '1px solid transparent' };
     const fromIdx = listTasks.findIndex(t => t.id === dragId.current);
     const toIdx = listTasks.findIndex(t => t.id === taskId);
     return fromIdx < toIdx
-      ? { borderTop: '2px solid transparent', borderBottom: '2px solid var(--accent)' }
-      : { borderTop: '2px solid var(--accent)', borderBottom: '2px solid transparent' };
+      ? { borderTop: '1px solid transparent', borderBottom: '1px solid var(--accent)' }
+      : { borderTop: '1px solid var(--accent)', borderBottom: '1px solid transparent' };
   };
 
   const { containerRef: touchContainerRef, handleTouchStart, getTouchDragBorder, draggingId } = useTouchSortable(
@@ -443,7 +443,7 @@ export function ListView() {
           タスクはありません
         </div>
       ) : (
-        <div ref={touchContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div ref={touchContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           {listTasks.map((t) => (
             <div
               key={t.id}

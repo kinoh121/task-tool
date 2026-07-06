@@ -63,7 +63,7 @@ export function CopySelectionView() {
             <button className="btn btn-ghost btn-sm" onClick={() => setSelected(new Set())}>全解除</button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginBottom: 24 }}>
             {tasks.map((task) => (
               <label
                 key={task.id}

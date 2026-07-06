@@ -131,7 +131,7 @@ export function PastView() {
           この日の記録はありません
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           {tasks.map((t) => (
             <div key={t.id} style={{ position: 'relative' }}>
               <TaskCard task={t} />

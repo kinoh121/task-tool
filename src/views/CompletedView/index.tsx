@@ -29,7 +29,7 @@ export function CompletedView() {
             }}>
               {date.replace(/-/g, '/')}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {(grouped.get(date) || []).map((t) => (
                 <TaskCard key={t.id} task={t} />
               ))}
