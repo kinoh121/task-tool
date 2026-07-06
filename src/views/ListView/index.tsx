@@ -28,7 +28,17 @@ function reorderArray(arr: Task[], fromId: string, toId: string): Task[] {
 }
 
 export function ListView() {
-  const { state, reorderTasks, addTask, addGroup } = useTaskContext();
+  const {
+    state,
+    reorderTasks,
+    addTask,
+    addGroup,
+    updateGroup,
+    deleteGroup,
+    addList,
+    updateList,
+    deleteList,
+  } = useTaskContext();
   const { state: appState, dispatch } = useAppState();
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -36,6 +46,12 @@ export function ListView() {
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [addingGroup, setAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
+  const [addingListForGroup, setAddingListForGroup] = useState<string | null>(null);
+  const [newListName, setNewListName] = useState('');
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editGroupName, setEditGroupName] = useState('');
+  const [editingListId, setEditingListId] = useState<string | null>(null);
+  const [editListName, setEditListName] = useState('');
 
   const dragId = useRef<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -111,6 +127,56 @@ export function ListView() {
     setAddingGroup(false);
   };
 
+  const handleAddList = async (e: React.FormEvent, groupId: string) => {
+    e.preventDefault();
+    const name = newListName.trim();
+    if (!name) return;
+    const id = await addList(name, groupId);
+    setNewListName('');
+    setAddingListForGroup(null);
+    dispatch({ type: 'SELECT_LIST', listId: id });
+  };
+
+  const handleEditGroup = async (e: React.FormEvent, groupId: string) => {
+    e.preventDefault();
+    const name = editGroupName.trim();
+    if (!name) return;
+    await updateGroup(groupId, name);
+    setEditingGroupId(null);
+    setEditGroupName('');
+  };
+
+  const handleEditList = async (e: React.FormEvent, listId: string) => {
+    e.preventDefault();
+    const name = editListName.trim();
+    if (!name) return;
+    await updateList(listId, name);
+    setEditingListId(null);
+    setEditListName('');
+  };
+
+  const startEditGroup = (groupId: string, name: string) => {
+    setAddingListForGroup(null);
+    setEditingListId(null);
+    setEditingGroupId(groupId);
+    setEditGroupName(name);
+  };
+
+  const startEditList = (listId: string, name: string) => {
+    setAddingListForGroup(null);
+    setEditingGroupId(null);
+    setEditingListId(listId);
+    setEditListName(name);
+  };
+
+  const mobileIconButtonStyle = {
+    width: 36,
+    minWidth: 36,
+    minHeight: 36,
+    padding: 0,
+    fontSize: 16,
+  };
+
   if (!selectedList) {
     if (!isMobile) return <div style={{ flex: 1 }} />;
     return (
@@ -156,9 +222,94 @@ export function ListView() {
           const groupLists = state.lists.filter((l) => l.groupId === group.id);
           return (
             <div key={group.id} style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {group.name}
-              </div>
+              {editingGroupId === group.id ? (
+                <form onSubmit={(e) => handleEditGroup(e, group.id)} style={{ marginBottom: 8 }}>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      value={editGroupName}
+                      onChange={(e) => setEditGroupName(e.target.value)}
+                      autoFocus
+                    />
+                    <button type="submit" className="btn btn-primary btn-sm" disabled={!editGroupName.trim()} style={mobileIconButtonStyle}>
+                      ✓
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        setEditingGroupId(null);
+                        setEditGroupName('');
+                      }}
+                      style={mobileIconButtonStyle}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {group.name}
+                  </div>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setEditingGroupId(null);
+                      setAddingListForGroup(group.id);
+                    }}
+                    title="リスト追加"
+                    style={mobileIconButtonStyle}
+                  >
+                    +
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => startEditGroup(group.id, group.name)}
+                    title="グループ名を変更"
+                    style={{ ...mobileIconButtonStyle, fontSize: 14 }}
+                  >
+                    ✎
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      if (confirm(`グループ「${group.name}」を削除しますか？`)) deleteGroup(group.id);
+                    }}
+                    title="グループ削除"
+                    style={{ ...mobileIconButtonStyle, color: 'var(--danger)' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {addingListForGroup === group.id && (
+                <form onSubmit={(e) => handleAddList(e, group.id)} style={{ marginBottom: 8 }}>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      value={newListName}
+                      onChange={(e) => setNewListName(e.target.value)}
+                      placeholder="リスト名"
+                      autoFocus
+                    />
+                    <button type="submit" className="btn btn-primary btn-sm" disabled={!newListName.trim()} style={mobileIconButtonStyle}>
+                      ✓
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        setNewListName('');
+                        setAddingListForGroup(null);
+                      }}
+                      style={mobileIconButtonStyle}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </form>
+              )}
+
               {groupLists.length === 0 ? (
                 <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: '10px 12px', border: '1px dashed var(--border)', borderRadius: 'var(--radius)' }}>
                   リストがありません
@@ -166,18 +317,65 @@ export function ListView() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {groupLists.map((list) => (
-                    <button
-                      key={list.id}
-                      onClick={() => dispatch({ type: 'SELECT_LIST', listId: list.id })}
-                      style={{
-                        width: '100%', textAlign: 'left', padding: '12px 16px',
-                        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                        borderRadius: 'var(--radius)', fontSize: 14, color: 'var(--text-primary)',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {list.name}
-                    </button>
+                    <div key={list.id}>
+                      {editingListId === list.id ? (
+                        <form onSubmit={(e) => handleEditList(e, list.id)}>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <input
+                              value={editListName}
+                              onChange={(e) => setEditListName(e.target.value)}
+                              autoFocus
+                            />
+                            <button type="submit" className="btn btn-primary btn-sm" disabled={!editListName.trim()} style={mobileIconButtonStyle}>
+                              ✓
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => {
+                                setEditingListId(null);
+                                setEditListName('');
+                              }}
+                              style={mobileIconButtonStyle}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <button
+                            onClick={() => dispatch({ type: 'SELECT_LIST', listId: list.id })}
+                            style={{
+                              flex: 1, minWidth: 0, textAlign: 'left', padding: '12px 16px',
+                              background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                              borderRadius: 'var(--radius)', fontSize: 14, color: 'var(--text-primary)',
+                              cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {list.name}
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => startEditList(list.id, list.name)}
+                            title="リスト名を変更"
+                            style={{ ...mobileIconButtonStyle, fontSize: 14 }}
+                          >
+                            ✎
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => {
+                              if (confirm(`リスト「${list.name}」を削除しますか？`)) deleteList(list.id);
+                            }}
+                            title="リスト削除"
+                            style={{ ...mobileIconButtonStyle, color: 'var(--danger)' }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
