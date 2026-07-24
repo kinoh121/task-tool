@@ -77,9 +77,11 @@ interface TaskContextValue {
   addGroup: (name: string) => Promise<string>;
   updateGroup: (id: string, name: string) => Promise<void>;
   deleteGroup: (id: string) => Promise<void>;
+  reorderGroups: (orderedIds: string[]) => Promise<void>;
   addList: (name: string, groupId: string) => Promise<string>;
   updateList: (id: string, name: string) => Promise<void>;
   deleteList: (id: string) => Promise<void>;
+  reorderLists: (orderedIds: string[]) => Promise<void>;
   addTask: (data: Partial<Task>) => Promise<string>;
   updateTask: (id: string, data: Partial<Task>) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
@@ -114,9 +116,17 @@ function DemoTaskProvider({ children }: { children: React.ReactNode }) {
     addGroup: async (name) => { const id = newId(); setGroups(g => [...g, { id, name, order: Date.now(), createdAt: new Date() }]); return id; },
     updateGroup: async (id, name) => setGroups(g => g.map(x => x.id === id ? { ...x, name } : x)),
     deleteGroup: async (id) => setGroups(g => g.filter(x => x.id !== id)),
+    reorderGroups: async (orderedIds) => setGroups(prev => {
+      const orderMap = new Map(orderedIds.map((id, i) => [id, i + 1]));
+      return prev.map(g => orderMap.has(g.id) ? { ...g, order: orderMap.get(g.id)! } : g).sort((a, b) => a.order - b.order);
+    }),
     addList: async (name, groupId) => { const id = newId(); setLists(l => [...l, { id, name, groupId, order: Date.now(), createdAt: new Date() }]); return id; },
     updateList: async (id, name) => setLists(l => l.map(x => x.id === id ? { ...x, name } : x)),
     deleteList: async (id) => setLists(l => l.filter(x => x.id !== id)),
+    reorderLists: async (orderedIds) => setLists(prev => {
+      const orderMap = new Map(orderedIds.map((id, i) => [id, i + 1]));
+      return prev.map(l => orderMap.has(l.id) ? { ...l, order: orderMap.get(l.id)! } : l).sort((a, b) => a.order - b.order);
+    }),
     addTask: async (data) => {
       const id = newId();
       setTasks(prev => {
@@ -282,6 +292,14 @@ function RealTaskProvider({ children }: { children: React.ReactNode }) {
     await deleteDoc(doc(db, 'users', uid, 'groups', id));
   };
 
+  const reorderGroups = async (orderedIds: string[]) => {
+    const batch = writeBatch(db);
+    orderedIds.forEach((id, i) => {
+      batch.update(doc(db, 'users', uid, 'groups', id), { order: i + 1 });
+    });
+    await batch.commit();
+  };
+
   const addList = async (name: string, groupId: string) => {
     const ref = await addDoc(collection(db, 'users', uid, 'lists'), {
       name, groupId, order: Date.now(), createdAt: serverTimestamp(),
@@ -295,6 +313,14 @@ function RealTaskProvider({ children }: { children: React.ReactNode }) {
 
   const deleteList = async (id: string) => {
     await deleteDoc(doc(db, 'users', uid, 'lists', id));
+  };
+
+  const reorderLists = async (orderedIds: string[]) => {
+    const batch = writeBatch(db);
+    orderedIds.forEach((id, i) => {
+      batch.update(doc(db, 'users', uid, 'lists', id), { order: i + 1 });
+    });
+    await batch.commit();
   };
 
   const addTask = async (data: Partial<Task>) => {
@@ -491,8 +517,8 @@ function RealTaskProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <TaskContext.Provider value={{
-      state, addGroup, updateGroup, deleteGroup,
-      addList, updateList, deleteList,
+      state, addGroup, updateGroup, deleteGroup, reorderGroups,
+      addList, updateList, deleteList, reorderLists,
       addTask, updateTask, deleteTask, completeTask, restoreTask,
       archiveTasks, copyTasks, addToToday, removeFromToday,
       setTopPriority, setSecondPriority, reorderTasks, duplicateTask,

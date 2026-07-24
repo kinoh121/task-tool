@@ -6,6 +6,15 @@ import { useAppState } from '../../contexts/AppContext';
 
 const LONG_PRESS_MS = 500;
 
+function moveId(ids: string[], id: string, direction: -1 | 1) {
+  const index = ids.indexOf(id);
+  const nextIndex = index + direction;
+  if (index < 0 || nextIndex < 0 || nextIndex >= ids.length) return ids;
+  const next = [...ids];
+  [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+  return next;
+}
+
 /** 長押し用ハンドラを返す（通常関数 — フックではないのでmap内でも使用可）*/
 function makeLongPress(onLongPress: () => void) {
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -23,7 +32,17 @@ export function SideNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const { handleSignOut } = useAuth();
-  const { state: taskState, addGroup, updateGroup, addList, updateList, deleteGroup, deleteList } = useTaskContext();
+  const {
+    state: taskState,
+    addGroup,
+    updateGroup,
+    deleteGroup,
+    reorderGroups,
+    addList,
+    updateList,
+    deleteList,
+    reorderLists,
+  } = useTaskContext();
   const { state: appState, dispatch } = useAppState();
 
   const initialOpenDone = useRef(false);
@@ -165,9 +184,11 @@ export function SideNav() {
           </form>
         )}
 
-        {taskState.groups.map((group) => {
+        {taskState.groups.map((group, groupIndex) => {
           const groupLists = taskState.lists.filter((l) => l.groupId === group.id);
           const isOpen = (appState.openGroupIds ?? []).includes(group.id);
+          const groupIds = taskState.groups.map((g) => g.id);
+          const listIds = groupLists.map((l) => l.id);
 
           const startGroupEdit = () => { setEditingGroupId(group.id); setEditGroupName(group.name); };
           const groupLongPress = makeLongPress(startGroupEdit);
@@ -216,6 +237,20 @@ export function SideNav() {
                   <>
                     <button
                       className="btn btn-ghost btn-sm"
+                      onClick={() => reorderGroups(moveId(groupIds, group.id, -1))}
+                      disabled={groupIndex === 0}
+                      title="グループを上へ"
+                      style={{ fontSize: 12, padding: '2px 5px', minHeight: 28, color: 'var(--text-muted)' }}
+                    >↑</button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => reorderGroups(moveId(groupIds, group.id, 1))}
+                      disabled={groupIndex === taskState.groups.length - 1}
+                      title="グループを下へ"
+                      style={{ fontSize: 12, padding: '2px 5px', minHeight: 28, color: 'var(--text-muted)' }}
+                    >↓</button>
+                    <button
+                      className="btn btn-ghost btn-sm"
                       onClick={() => setAddingListForGroup(group.id)}
                       title="リスト追加"
                       style={{ fontSize: 14, padding: '2px 6px', minHeight: 28, color: 'var(--text-muted)' }}
@@ -248,7 +283,7 @@ export function SideNav() {
                 </form>
               )}
 
-              {isOpen && groupLists.map((list) => {
+              {isOpen && groupLists.map((list, listIndex) => {
                 const listActive = appState.selectedListId === list.id && isActive('/lists');
                 const startListEdit = () => { setEditingListId(list.id); setEditListName(list.name); };
                 const listLongPress = makeLongPress(startListEdit);
@@ -294,14 +329,30 @@ export function SideNav() {
                       </button>
                     )}
                     {editingListId !== list.id && (
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => {
-                          if (confirm(`リスト「${list.name}」を削除しますか？`)) deleteList(list.id);
-                        }}
-                        title="リスト削除"
-                        style={{ fontSize: 12, padding: '2px 6px', minHeight: 28, color: 'var(--text-muted)', marginRight: 4 }}
-                      >✕</button>
+                      <>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => reorderLists(moveId(listIds, list.id, -1))}
+                          disabled={listIndex === 0}
+                          title="リストを上へ"
+                          style={{ fontSize: 12, padding: '2px 5px', minHeight: 28, color: 'var(--text-muted)' }}
+                        >↑</button>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => reorderLists(moveId(listIds, list.id, 1))}
+                          disabled={listIndex === groupLists.length - 1}
+                          title="リストを下へ"
+                          style={{ fontSize: 12, padding: '2px 5px', minHeight: 28, color: 'var(--text-muted)' }}
+                        >↓</button>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => {
+                            if (confirm(`リスト「${list.name}」を削除しますか？`)) deleteList(list.id);
+                          }}
+                          title="リスト削除"
+                          style={{ fontSize: 12, padding: '2px 6px', minHeight: 28, color: 'var(--text-muted)', marginRight: 4 }}
+                        >✕</button>
+                      </>
                     )}
                   </div>
                 );

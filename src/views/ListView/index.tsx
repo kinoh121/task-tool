@@ -27,6 +27,15 @@ function reorderArray(arr: Task[], fromId: string, toId: string): Task[] {
   return result;
 }
 
+function moveId(ids: string[], id: string, direction: -1 | 1) {
+  const index = ids.indexOf(id);
+  const nextIndex = index + direction;
+  if (index < 0 || nextIndex < 0 || nextIndex >= ids.length) return ids;
+  const next = [...ids];
+  [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+  return next;
+}
+
 export function ListView() {
   const {
     state,
@@ -35,9 +44,11 @@ export function ListView() {
     addGroup,
     updateGroup,
     deleteGroup,
+    reorderGroups,
     addList,
     updateList,
     deleteList,
+    reorderLists,
   } = useTaskContext();
   const { state: appState, dispatch } = useAppState();
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
@@ -218,8 +229,10 @@ export function ListView() {
           </form>
         )}
 
-        {state.groups.map((group) => {
+        {state.groups.map((group, groupIndex) => {
+          const groupIds = state.groups.map((g) => g.id);
           const groupLists = state.lists.filter((l) => l.groupId === group.id);
+          const listIds = groupLists.map((l) => l.id);
           return (
             <div key={group.id} style={{ marginBottom: 20 }}>
               {editingGroupId === group.id ? (
@@ -251,6 +264,24 @@ export function ListView() {
                   <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {group.name}
                   </div>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => reorderGroups(moveId(groupIds, group.id, -1))}
+                    disabled={groupIndex === 0}
+                    title="グループを上へ"
+                    style={mobileIconButtonStyle}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => reorderGroups(moveId(groupIds, group.id, 1))}
+                    disabled={groupIndex === state.groups.length - 1}
+                    title="グループを下へ"
+                    style={mobileIconButtonStyle}
+                  >
+                    ↓
+                  </button>
                   <button
                     className="btn btn-ghost btn-sm"
                     onClick={() => {
@@ -316,7 +347,7 @@ export function ListView() {
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {groupLists.map((list) => (
+                  {groupLists.map((list, listIndex) => (
                     <div key={list.id}>
                       {editingListId === list.id ? (
                         <form onSubmit={(e) => handleEditList(e, list.id)}>
@@ -362,6 +393,24 @@ export function ListView() {
                             }}
                           >
                             {list.name}
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => reorderLists(moveId(listIds, list.id, -1))}
+                            disabled={listIndex === 0}
+                            title="リストを上へ"
+                            style={{ ...mobileIconButtonStyle, flexShrink: 0 }}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => reorderLists(moveId(listIds, list.id, 1))}
+                            disabled={listIndex === groupLists.length - 1}
+                            title="リストを下へ"
+                            style={{ ...mobileIconButtonStyle, flexShrink: 0 }}
+                          >
+                            ↓
                           </button>
                           <button
                             className="btn btn-ghost btn-sm"
