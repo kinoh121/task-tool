@@ -6,6 +6,13 @@ import { useAppState } from '../../contexts/AppContext';
 
 const LONG_PRESS_MS = 500;
 
+type MenuItemProps = {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+};
+
 function moveId(ids: string[], id: string, direction: -1 | 1) {
   const index = ids.indexOf(id);
   const nextIndex = index + direction;
@@ -64,8 +71,48 @@ export function SideNav() {
   const [editGroupName, setEditGroupName] = useState('');
   const [editingListId, setEditingListId] = useState<string | null>(null);
   const [editListName, setEditListName] = useState('');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const isActive = (path: string) => location.pathname === path;
+
+  const menuStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: 30,
+    right: 4,
+    zIndex: 20,
+    minWidth: 128,
+    padding: 4,
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    boxShadow: 'var(--shadow)',
+  };
+
+  const MenuItem = ({ children, onClick, disabled, danger }: MenuItemProps) => (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => {
+        if (disabled) return;
+        setOpenMenuId(null);
+        onClick();
+      }}
+      style={{
+        display: 'block',
+        width: '100%',
+        padding: '7px 9px',
+        textAlign: 'left',
+        fontSize: 12,
+        color: danger ? 'var(--danger)' : 'var(--text-secondary)',
+        opacity: disabled ? 0.4 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        borderRadius: 4,
+        background: 'transparent',
+      }}
+    >
+      {children}
+    </button>
+  );
 
   const handleAddGroup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -195,7 +242,7 @@ export function SideNav() {
 
           return (
             <div key={group.id}>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
                 {editingGroupId === group.id ? (
                   <form onSubmit={(e) => handleEditGroup(e, group.id)} style={{ flex: 1, padding: '4px 8px 4px 28px' }}>
                     <div style={{ display: 'flex', gap: 4 }}>
@@ -234,36 +281,28 @@ export function SideNav() {
                   </button>
                 )}
                 {editingGroupId !== group.id && (
-                  <>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => reorderGroups(moveId(groupIds, group.id, -1))}
-                      disabled={groupIndex === 0}
-                      title="グループを上へ"
-                      style={{ fontSize: 12, padding: '2px 5px', minHeight: 28, color: 'var(--text-muted)' }}
-                    >↑</button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => reorderGroups(moveId(groupIds, group.id, 1))}
-                      disabled={groupIndex === taskState.groups.length - 1}
-                      title="グループを下へ"
-                      style={{ fontSize: 12, padding: '2px 5px', minHeight: 28, color: 'var(--text-muted)' }}
-                    >↓</button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => setAddingListForGroup(group.id)}
-                      title="リスト追加"
-                      style={{ fontSize: 14, padding: '2px 6px', minHeight: 28, color: 'var(--text-muted)' }}
-                    >+</button>
-                    <button
-                      className="btn btn-ghost btn-sm"
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setOpenMenuId(openMenuId === `group:${group.id}` ? null : `group:${group.id}`)}
+                    title="グループ操作"
+                    style={{ fontSize: 16, padding: '2px 8px', minHeight: 28, color: 'var(--text-muted)', marginRight: 4 }}
+                  >⋯</button>
+                )}
+                {openMenuId === `group:${group.id}` && editingGroupId !== group.id && (
+                  <div style={menuStyle}>
+                    <MenuItem onClick={() => reorderGroups(moveId(groupIds, group.id, -1))} disabled={groupIndex === 0}>上へ移動</MenuItem>
+                    <MenuItem onClick={() => reorderGroups(moveId(groupIds, group.id, 1))} disabled={groupIndex === taskState.groups.length - 1}>下へ移動</MenuItem>
+                    <MenuItem onClick={() => setAddingListForGroup(group.id)}>リスト追加</MenuItem>
+                    <MenuItem onClick={startGroupEdit}>名前変更</MenuItem>
+                    <MenuItem
+                      danger
                       onClick={() => {
                         if (confirm(`グループ「${group.name}」を削除しますか？`)) deleteGroup(group.id);
                       }}
-                      title="グループ削除"
-                      style={{ fontSize: 12, padding: '2px 6px', minHeight: 28, color: 'var(--text-muted)', marginRight: 4 }}
-                    >✕</button>
-                  </>
+                    >
+                      削除
+                    </MenuItem>
+                  </div>
                 )}
               </div>
 
@@ -289,7 +328,7 @@ export function SideNav() {
                 const listLongPress = makeLongPress(startListEdit);
 
                 return (
-                  <div key={list.id} style={{ display: 'flex', alignItems: 'center' }}>
+                  <div key={list.id} style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
                     {editingListId === list.id ? (
                       <form onSubmit={(e) => handleEditList(e, list.id)} style={{ flex: 1, padding: '4px 8px 4px 40px' }}>
                         <div style={{ display: 'flex', gap: 4 }}>
@@ -329,30 +368,27 @@ export function SideNav() {
                       </button>
                     )}
                     {editingListId !== list.id && (
-                      <>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => reorderLists(moveId(listIds, list.id, -1))}
-                          disabled={listIndex === 0}
-                          title="リストを上へ"
-                          style={{ fontSize: 12, padding: '2px 5px', minHeight: 28, color: 'var(--text-muted)' }}
-                        >↑</button>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => reorderLists(moveId(listIds, list.id, 1))}
-                          disabled={listIndex === groupLists.length - 1}
-                          title="リストを下へ"
-                          style={{ fontSize: 12, padding: '2px 5px', minHeight: 28, color: 'var(--text-muted)' }}
-                        >↓</button>
-                        <button
-                          className="btn btn-ghost btn-sm"
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setOpenMenuId(openMenuId === `list:${list.id}` ? null : `list:${list.id}`)}
+                        title="リスト操作"
+                        style={{ fontSize: 16, padding: '2px 8px', minHeight: 28, color: 'var(--text-muted)', marginRight: 4 }}
+                      >⋯</button>
+                    )}
+                    {openMenuId === `list:${list.id}` && editingListId !== list.id && (
+                      <div style={menuStyle}>
+                        <MenuItem onClick={() => reorderLists(moveId(listIds, list.id, -1))} disabled={listIndex === 0}>上へ移動</MenuItem>
+                        <MenuItem onClick={() => reorderLists(moveId(listIds, list.id, 1))} disabled={listIndex === groupLists.length - 1}>下へ移動</MenuItem>
+                        <MenuItem onClick={startListEdit}>名前変更</MenuItem>
+                        <MenuItem
+                          danger
                           onClick={() => {
                             if (confirm(`リスト「${list.name}」を削除しますか？`)) deleteList(list.id);
                           }}
-                          title="リスト削除"
-                          style={{ fontSize: 12, padding: '2px 6px', minHeight: 28, color: 'var(--text-muted)', marginRight: 4 }}
-                        >✕</button>
-                      </>
+                        >
+                          削除
+                        </MenuItem>
+                      </div>
                     )}
                   </div>
                 );

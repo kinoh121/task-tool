@@ -7,6 +7,13 @@ import { Modal } from '../../components/ui/Modal';
 import { useTouchSortable } from '../../hooks/useTouchSortable';
 import type { Task } from '../../types';
 
+type MenuItemProps = {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+};
+
 function downloadMd(filename: string, content: string) {
   const blob = new Blob([content], { type: 'text/markdown' });
   const url = URL.createObjectURL(blob);
@@ -63,6 +70,7 @@ export function ListView() {
   const [editGroupName, setEditGroupName] = useState('');
   const [editingListId, setEditingListId] = useState<string | null>(null);
   const [editListName, setEditListName] = useState('');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const dragId = useRef<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -188,6 +196,45 @@ export function ListView() {
     fontSize: 16,
   };
 
+  const menuStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: 38,
+    right: 0,
+    zIndex: 30,
+    minWidth: 144,
+    padding: 4,
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    boxShadow: 'var(--shadow)',
+  };
+
+  const MenuItem = ({ children, onClick, disabled, danger }: MenuItemProps) => (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => {
+        if (disabled) return;
+        setOpenMenuId(null);
+        onClick();
+      }}
+      style={{
+        display: 'block',
+        width: '100%',
+        padding: '9px 10px',
+        textAlign: 'left',
+        fontSize: 14,
+        color: danger ? 'var(--danger)' : 'var(--text-secondary)',
+        opacity: disabled ? 0.4 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        borderRadius: 4,
+        background: 'transparent',
+      }}
+    >
+      {children}
+    </button>
+  );
+
   if (!selectedList) {
     if (!isMobile) return <div style={{ flex: 1 }} />;
     return (
@@ -260,57 +307,41 @@ export function ListView() {
                   </div>
                 </form>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, position: 'relative' }}>
                   <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {group.name}
                   </div>
                   <button
                     className="btn btn-ghost btn-sm"
-                    onClick={() => reorderGroups(moveId(groupIds, group.id, -1))}
-                    disabled={groupIndex === 0}
-                    title="グループを上へ"
-                    style={mobileIconButtonStyle}
+                    onClick={() => setOpenMenuId(openMenuId === `group:${group.id}` ? null : `group:${group.id}`)}
+                    title="グループ操作"
+                    style={{ ...mobileIconButtonStyle, color: 'var(--text-muted)' }}
                   >
-                    ↑
+                    ⋯
                   </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => reorderGroups(moveId(groupIds, group.id, 1))}
-                    disabled={groupIndex === state.groups.length - 1}
-                    title="グループを下へ"
-                    style={mobileIconButtonStyle}
-                  >
-                    ↓
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => {
-                      setEditingGroupId(null);
-                      setAddingListForGroup(group.id);
-                    }}
-                    title="リスト追加"
-                    style={mobileIconButtonStyle}
-                  >
-                    +
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => startEditGroup(group.id, group.name)}
-                    title="グループ名を変更"
-                    style={{ ...mobileIconButtonStyle, fontSize: 14 }}
-                  >
-                    ✎
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => {
-                      if (confirm(`グループ「${group.name}」を削除しますか？`)) deleteGroup(group.id);
-                    }}
-                    title="グループ削除"
-                    style={{ ...mobileIconButtonStyle, color: 'var(--danger)' }}
-                  >
-                    ✕
-                  </button>
+                  {openMenuId === `group:${group.id}` && (
+                    <div style={menuStyle}>
+                      <MenuItem onClick={() => reorderGroups(moveId(groupIds, group.id, -1))} disabled={groupIndex === 0}>上へ移動</MenuItem>
+                      <MenuItem onClick={() => reorderGroups(moveId(groupIds, group.id, 1))} disabled={groupIndex === state.groups.length - 1}>下へ移動</MenuItem>
+                      <MenuItem
+                        onClick={() => {
+                          setEditingGroupId(null);
+                          setAddingListForGroup(group.id);
+                        }}
+                      >
+                        リスト追加
+                      </MenuItem>
+                      <MenuItem onClick={() => startEditGroup(group.id, group.name)}>名前変更</MenuItem>
+                      <MenuItem
+                        danger
+                        onClick={() => {
+                          if (confirm(`グループ「${group.name}」を削除しますか？`)) deleteGroup(group.id);
+                        }}
+                      >
+                        削除
+                      </MenuItem>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -381,7 +412,8 @@ export function ListView() {
                             background: 'var(--bg-secondary)',
                             border: '1px solid var(--border)',
                             borderRadius: 'var(--radius)',
-                            overflow: 'hidden',
+                            overflow: 'visible',
+                            position: 'relative',
                           }}
                         >
                           <button
@@ -396,40 +428,27 @@ export function ListView() {
                           </button>
                           <button
                             className="btn btn-ghost btn-sm"
-                            onClick={() => reorderLists(moveId(listIds, list.id, -1))}
-                            disabled={listIndex === 0}
-                            title="リストを上へ"
+                            onClick={() => setOpenMenuId(openMenuId === `list:${list.id}` ? null : `list:${list.id}`)}
+                            title="リスト操作"
                             style={{ ...mobileIconButtonStyle, flexShrink: 0 }}
                           >
-                            ↑
+                            ⋯
                           </button>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => reorderLists(moveId(listIds, list.id, 1))}
-                            disabled={listIndex === groupLists.length - 1}
-                            title="リストを下へ"
-                            style={{ ...mobileIconButtonStyle, flexShrink: 0 }}
-                          >
-                            ↓
-                          </button>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => startEditList(list.id, list.name)}
-                            title="リスト名を変更"
-                            style={{ ...mobileIconButtonStyle, fontSize: 14, flexShrink: 0 }}
-                          >
-                            ✎
-                          </button>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => {
-                              if (confirm(`リスト「${list.name}」を削除しますか？`)) deleteList(list.id);
-                            }}
-                            title="リスト削除"
-                            style={{ ...mobileIconButtonStyle, color: 'var(--danger)', flexShrink: 0 }}
-                          >
-                            ✕
-                          </button>
+                          {openMenuId === `list:${list.id}` && (
+                            <div style={menuStyle}>
+                              <MenuItem onClick={() => reorderLists(moveId(listIds, list.id, -1))} disabled={listIndex === 0}>上へ移動</MenuItem>
+                              <MenuItem onClick={() => reorderLists(moveId(listIds, list.id, 1))} disabled={listIndex === groupLists.length - 1}>下へ移動</MenuItem>
+                              <MenuItem onClick={() => startEditList(list.id, list.name)}>名前変更</MenuItem>
+                              <MenuItem
+                                danger
+                                onClick={() => {
+                                  if (confirm(`リスト「${list.name}」を削除しますか？`)) deleteList(list.id);
+                                }}
+                              >
+                                削除
+                              </MenuItem>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
